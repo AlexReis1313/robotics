@@ -3,14 +3,15 @@ import time
 import serial
 
 class Robot():
-	def __init__(self, comPort, robotSpeed, sensitivity):
+	def __init__(self, comPort, robotSpeed, sensitivityHigh, sensitivityLow):
 		#initialization of the robot class
 		#this function opens the serial connection between the robot and the computer, defined the robot's speed % and calibrates the robot
 		self.ser = serial.Serial(comPort, baudrate=9600, bytesize=8, timeout=2, parity='N', xonxoff=0)
 		print("COM port in use: {0}".format(self.ser.name))
 		self.ser.write(f'Speed {robotSpeed}\r'.encode('utf-8'))
 		self.calibrate()
-		self.sensitivity = sensitivity
+		self.sensitivity = sensitivityHigh
+		self.otherSensitivity= sensitivityLow
 
 	def calibrate (self):	#function that is used to calibrate the robot in the begging of running the program
 		print('Move the robot arm to the calibration position. Use the Teach Pendent')
@@ -30,6 +31,14 @@ class Robot():
 		return self.calibratedPos
 	def get_sensitivity(self):
 		return self.sensitivity
+	
+	def set_sensitivity(self, buttonPressed):
+		if self.L3Pressed and buttonPressed: #L3 was pressed and still is - no changes to sensitivity
+			return None
+		elif not self.L3Pressed and buttonPressed: #L3 was not pressed and now is pressed - change sensitivity from Low to high or High to low
+			self.sensitivity , self.otherSensitivity  = self.otherSensitivity,  self.sensitivity
+		else:
+			self.L3Pressed=False #button L3 is not pressed - prepare to change sensitivity when L3 is pressed again
 
 	def go_home(self):
 		self.ser.write(b'home\r')
@@ -125,6 +134,11 @@ class Robot():
 	
 	
 def joystickToDeltas_bisturi(axes, buttons, robot):
+	if buttons[11]==1:
+		robot.set_sensitivity(True) #Change the sensitivity of the robot (between high and low sensitivity)
+	else:
+		robot.set_sensitivity(False) #inform robot that L3 button has been depressed
+	
 	sensitivity = robot.get_sensitivity()
 	x = axes[0]*sensitivity     #x axis controled by horizontal movemento of left analogue
 	y = axes[1]*sensitivity     #y axis controled by vertical movemento of left analogue
@@ -175,7 +189,7 @@ def initialize_joystick():
 	
 
 def main(): 
-	bisturi_robot=Robot('COM4', 15, 50) #com port, robot speed and sensitivity for robot movement
+	bisturi_robot=Robot('COM4', 15, 50, 10) #com port, robot speed and sensitivity values high and low for robot movement
 	robots=[bisturi_robot] #eventually this list will have both the bisturi and camera robot
 	# Counter 
 	count = 0
