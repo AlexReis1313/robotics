@@ -216,9 +216,9 @@ def moverobots(axes, buttons, robots):
 
 def initialize_keyboard(): #altered from joystick to keyboard for debugging
 	pygame.init()
-	
+	clock = pygame.time.Clock()
 	window = pygame.display.set_mode((300, 300))
-	return window
+	return window, clock
 	
 
 def main(): 
@@ -226,7 +226,7 @@ def main():
 	robots=[bisturi_robot] #eventually this list will have both the bisturi and camera robot
 	# Counter 
 	count = 0
-	window = initialize_keyboard() #altered from joystick to keyboard for debugging
+	window, clock = initialize_keyboard() #altered from joystick to keyboard for debugging
 	
 	try:
 		while True:
@@ -265,7 +265,7 @@ def main():
 					moverobots(axes, buttons, robots) #this function should: translate joystick movements to actual movements for the robots using inverse and foward kinematics and apply the movement to the robot's class function move(self)
 					count += 1
 					#pygame.event.clear()
-
+				dt= clock.tick(3)
 				window.fill(0)
 			except:
 				pass
