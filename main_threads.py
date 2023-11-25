@@ -123,7 +123,8 @@ class Robot():
 		print('Old joints: ',self.joints)
 		print('Deltas joints: ', JointsDeltas)
 		self.joints = [self.joints[i] + JointsDeltas[i] for i in range(len(JointsDeltas))]
-		shared_queue.put(JointsDeltas)
+		putInQueue = JointsDeltas + self.joints #this concatenates in a list with 10 values
+		shared_queue.put(putInQueue)
 		        
         
         
@@ -184,6 +185,33 @@ def initialize_joystick():
 	return joystick
 	
 
+def get_joystick(joystick):
+	buttons=buttons_aux=[0 for i in range(16)]
+	axes=[0 for i in range(6)]
+	aux=0
+	quit=False
+	for event in pygame.event.get():
+		aux+=1
+		if event.type == pygame.QUIT:
+			quit=True
+				
+		# Get gamepad input
+		axes = [round(joystick.get_axis(i),3)+axes[i] for i in range(joystick.get_numaxes())]
+		buttons_aux = [joystick.get_button(i) + buttons_aux[i] for i in range(joystick.get_numbuttons())]
+			
+	for i, button in enumerate(buttons_aux):
+		if button>0:
+			buttons[i]=1
+
+	for i, axe in enumerate(axes):
+		axe_true=axe/(max(1,aux))
+		if abs(axe_true) > 0.2:
+			axes[i]=round(axe_true,3)
+		else:
+			axes[i]=0
+
+	return axes, buttons, quit
+
 def joystick_loop(shared_queue, robots):
 	# Counter 
 	count = 0
@@ -199,19 +227,11 @@ def joystick_loop(shared_queue, robots):
 			if axes!=[0,0,0,0] or buttons != [0,0,0,0,0,0,0,0,0,0,0,0]:
 					moverobots(axes, buttons, robots, shared_queue) #this function should: translate joystick movements to actual movements for the robots using inverse and foward kinematics and update the shared_queue with new joint values
 				
-			events = pygame.event.get()
-			for event in events:
-				if event.type == pygame.QUIT:
-					return
-				# Get gamepad input
-				axes = [round(joystick.get_axis(i),3) for i in range(joystick.get_numaxes())]
-				buttons = [joystick.get_button(i) for i in range(joystick.get_numbuttons())]	
-				for i, axe in enumerate(axes):
-						if abs(axe)<0.2:
-							axes[i]=0
-				print('Joystick values: \n', axes, '\n', buttons)
-				count += 1
-			pygame.event.clear()
+			axes, buttons, quit = get_joystick(joystick)
+			if quit:
+				return
+			print('Joystick values: \n', axes, '\n', buttons)
+			count += 1
 			joystickLoopClock.tick(FPS) # do not run loop faster than n times a second
 
 	except KeyboardInterrupt:
@@ -234,21 +254,22 @@ def joystick_loop(shared_queue, robots):
 
 
 
-def set_joints(joint_delta, ser):
-	
-	for i,delta in enumerate(joint_delta) :
-		if delta !=0:
-			printToRobot=f'SHIFT AA BY {i+1} {int(delta)} \r'
+def set_joints(jointDelta_values, ser):
+	deltas=jointDelta_values[0:5]
+	joints=jointDelta_values[5:10]
+	for i,joint in enumerate(joints) :
+		if deltas[i] !=0:
+			#printToRobot=f'SHIFT AA BY {i+1} {int(delta)} \r'
+			printToRobot=f'SETPV AA {i+1} {int(joint)}\r'
 			ser.write(printToRobot.encode('utf-8'))
-			time.sleep(0.5)
+			time.sleep(0.1)
 	
 
 
 def serial_comunication_loop(shared_queue, ser):
 	count=0
 	FPS=10
-	clock_serial = pygame.time.Clock
-	clock_serial.tick()
+	clock_serial = pygame.time.Clock()
 	while True:
 		# Check if the shared queue has data
 		if not shared_queue.empty() and count<3:
@@ -264,7 +285,7 @@ def serial_comunication_loop(shared_queue, ser):
 		elif needs_to_move:
 			print('Moving')
 			ser.write(b'MOVE AA \r')
-			read_and_wait(ser,0.1)
+			read_and_wait(ser,0.5)
 			needs_to_move=False
 			count=0
 
@@ -272,14 +293,13 @@ def serial_comunication_loop(shared_queue, ser):
 
 		
 def main():
-	bisturi_robot=Robot(15, 150, 1) #robot speed and sensitivity values high and low for robot movement
+	bisturi_robot=Robot('COM4',15, 150, 10) #robot speed and sensitivity values high and low for robot movement
 	robots=[bisturi_robot] #eventually this list will have both the bisturi and camera robot
 	serBisturi=bisturi_robot.get_serial()
 	shared_queue = queue.Queue() #this queue will save values for the robot's joint deltas
 
-
-	bisturi_serial_thread = threading.Thread(target=serial_comunication_loop, args=(shared_queue, serBisturi))
 	joystick_thread = threading.Thread(target=joystick_loop, args=(shared_queue,robots))
+	bisturi_serial_thread = threading.Thread(target=serial_comunication_loop, args=(shared_queue, serBisturi))
 	
 	joystick_thread.start()
 	bisturi_serial_thread.start()
