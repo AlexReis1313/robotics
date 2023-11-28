@@ -25,10 +25,15 @@ class Robot():
 	def get_serial(self):
 		return self.ser
 
-	def calibrate (self):	#function that is used to calibrate the robot in the begging of running the program
+	def calibrate (self, robot_type):	#function that is used to calibrate the robot in the begging of running the program
 		print('Move the robot arm to the calibration position. Use the Teach Pendent')
+		if robot_type =='bisturi':
+			input_String="Input 'y' when ready to calibrate (when the end effector is in the calibration position)"
+		elif robot_type =='camera':
+			input_String="Input 'y' when ready to calibrate (the end effector position should be vertically alligned with the jello)"
+
 		while True:
-			if 'y'==input("Input 'y' when ready to calibrate (when the end effector is in the calibration position)"):
+			if 'y'==input(input_String):
 				self.ser.write(b'HERE AA \r')
 				self.calculate_pos()
 				self.calibratedPos = self.get_pos()
@@ -118,23 +123,38 @@ class Robot():
 			shared_queue.put(putInQueue)
 
 
-""" def cameraRobot(Robot):
+def cameraRobot(Robot):
 	#This is a child class of the class Robot. This means that it has all the methods and variables that the Robot class has, 
-	but with added methods specific to the camera robor
-	def __init__(self, comPort, robotSpeed, sensitivityHigh, sensitivityLow ):
-		super().__init__(self, comPort, robotSpeed, sensitivityHigh, sensitivityLow) #inherite all methods from robot and do the init function
-		self.c= 
+	#but with added methods specific to the camera robor
+	def __init__(self, comPort, robotSpeed, sensitivityHigh, sensitivityLow):
+		super(cameraRobot, self).__init__(self, comPort, robotSpeed, sensitivityHigh, sensitivityLow, 'camera') #inherite all methods from robot and do the init function of rthe robot class
+		self.c= self.pos[2] #c=Z initial
+		self.v=(c*((1/3) + (math.pi/6))) + self.pos[1] #v = equation + y
+
 	def change_c(self, delta_c):
+		self.c+= 10
 
 	def get_c(self):
-
+		return self.c
+	
 	def change_v(self, delta_v):
+		self.v+=delta_v
+		if self.v> self.c*(4/3+ math.pi/6):
+			self.v = self.c*(4/3+ math.pi/6)
+		elif self.v<0:
+			self.v=0
 
 	def get_v(self):
-
-	def move_pos(self, new_pos, delta_pos , shared_queue):
-
- """
-
-
+		return self.v
 	
+	def move_pos(self, new_pos, delta_pos , shared_queue):
+		self.pos = new_pos
+		putInQueue = delta_pos + self.pos #this concatenates in a list with 10 values
+		
+		#to put joint values in queue - checking first if the values are not null
+		deltasum=0
+		for delta in delta_pos:
+			deltasum+=pow(delta,2) #sum of squared values
+		Threshold = 1
+		if deltasum>Threshold:
+			shared_queue.put(putInQueue)

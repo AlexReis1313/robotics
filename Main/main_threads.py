@@ -46,8 +46,8 @@ def joystickToDeltas_bisturi(axes, buttons, robot, shared_queue):
 
 	robot.move_joints([x,y,z,pitch,roll], shared_queue)
 	 
-""" 
-def move_2planes_semicircle(pos, c, v):
+
+def move_2planes_semicircle(pos,x, c, v):
 	#This function  is used to create the aprropriate trajectory for the camera robot. The trajectory along a specified surface.
 	#In this case, the surface is 2 perpenbdicular planes, united by a 1/4 cilindrical surface.
 	 
@@ -58,7 +58,7 @@ def move_2planes_semicircle(pos, c, v):
 		p=math.pi/2
 	elif v<((2/3) + (math.pi/6))*c:
 		theta = p = (v-(2*c/3))/3
-		x= c*math.sin(theta) #theta in radians
+		y= c*math.sin(theta) #theta in radians
 		z= c* (1 - math.cos(theta)/3)
 	else:
 		z=c
@@ -66,10 +66,10 @@ def move_2planes_semicircle(pos, c, v):
 		y=v - (c*((1/3) + (math.pi/6)))
 	
 	new_pos=[x,y,z,p,0]
-	delta_pos = new_pos- pos
+	delta_pos = [new_pos[i] - pos[i] for i in range(len(new_pos))]
 
 	return new_pos, delta_pos 
- """
+ 
 
 def joystickToDeltas_camera(axes, buttons, robot, shared_queue):
 	
@@ -84,7 +84,6 @@ def joystickToDeltas_camera(axes, buttons, robot, shared_queue):
 	
  	"""
 	sensitivity = robot.get_sensitivity()
-	
 	x = (-buttons[13] + buttons[14])*sensitivity		#change x(horiozntal position) with left and right arrows
 	v_delta= (-buttons[12] + buttons[11])*sensitivity 	#change v with up and down arrows
 	c_delta= (-buttons[9] + buttons[10])*sensitivity 	#change c constant with L1 and R1
@@ -92,20 +91,16 @@ def joystickToDeltas_camera(axes, buttons, robot, shared_queue):
 	pos=robot.get_pos()
 	robot.change_c(c_delta)
 	c= robot.get_c()
-
 	robot.change_v(v_delta) 
 	v= robot.get_v() #v will be a value between 0 and (4/3 + pii/6)*c
 
-	new_pos, delta_pos = move_2planes_semicircle(pos, c, v)	
+	new_pos, delta_pos = move_2planes_semicircle(pos,x, c, v)	
 
 	#In here, there should be an inverse kinematics function to translate positions to joints
 
-
 	robot.move_pos(new_pos, delta_pos , shared_queue)
 
-	#we need to implement an inheritance class for camera robot with methods: 
-	#	change_c; get_c;   change_v; get_v;     
-	#or joystickToDeltas_camera; change_c; change_v; move_2planes_semicircle; move_semicircle;  
+	
 
 
 
@@ -151,7 +146,7 @@ def joystick_loop(shared_queue, robots):
 
 	
 def main():
-	bisturi_robot=Robot('COM4',15, 50, 5) #robot speed and sensitivity values high and low for robot movement
+	bisturi_robot=Robot('COM4',15, 50, 5, 'bisturi') #robot speed and sensitivity values high and low for robot movement
 	robots=[bisturi_robot] #eventually this list will have both the bisturi and camera robot
 	serBisturi=bisturi_robot.get_serial()
 	shared_queue = queue.Queue() #this queue will save values for the robot's joint deltas
