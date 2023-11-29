@@ -14,7 +14,7 @@ class Robot():
 		
 		self.ser = serial.Serial(comPort, baudrate=9600, bytesize=8, timeout=2, parity='N', xonxoff=0) #change for lab ------------------------HERE FOR LAB
 		print("COM port in use: {0}".format(self.ser.name))
-		time.sleep(5)
+		time.sleep(2)
 		self.ser.write(f'Speed {robotSpeed}\r'.encode('utf-8'))
 		self.calibrate(robot_type) 
 		

@@ -12,20 +12,20 @@ class Robot():
 		
 		self.ser = serial.Serial(comPort, baudrate=9600, bytesize=8, timeout=2, parity='N', xonxoff=0) #change for lab ------------------------HERE FOR LAB
 		print("COM port in use: {0}".format(self.ser.name))
-		time.sleep(5)
+		""" time.sleep(5)
 		self.ser.write(f'Speed {robotSpeed}\r'.encode('utf-8'))
 		self.calibrate(robot_type) 
 		
-		""" 
+		 
 		self.ser=comPort # HERE FOR Home--------------------------------------------------
 		self.calibratedPos=[0,0,0,0,0]
 		self.joints=[0,0,0,0,0]
-		 """
+		
 		self.pos = self.calibratedPos
 		self.sensitivity = sensitivityHigh
 		self.otherSensitivity= sensitivityLow
 		self.triangle_Pressed=False
-		
+		 """
 
 
 	def get_serial(self):
@@ -218,44 +218,88 @@ def clean_buffer(ser):
             #print('buffer clean')
             break   
 
-def manual_start(serial):
-    serial.write(b'\r')
-    clean_buffer(serial)
-    time.sleep(0.5)
-    serial.write(b'~ \r')
-    time.sleep(0.1)
-    serial.write(b's \r')
-    time.sleep(0.1)
-    serial.write(b'5 \r')
-    time.sleep(0.1)
-    print(read_and_wait_original(serial, 2))
-    time.sleep(0.1)
-    print('Manual start')
+def initial_manual_start(serial):
+	serial.write(b'\r')
+	serial.write(b'~ \r')
+	serial.write(b's \r')
+	#speed=update_velocity(axes)
+	speed=15
+	serial.write(f'{speed} \r'.encode('utf-8'))
+	serial.write(b'X \r')
+	time.sleep(0.1)
+
+def manual_start_midle(serial):
+	serial.write(b'\r')
+	serial.write(b'~ \r')
+	serial.write(b's \r')
+	#speed=update_velocity(axes)
+	speed=30
+	serial.write(f'{speed} \r'.encode('utf-8'))
+	time.sleep(0.05)
 
 def manual_end(serial):
-    serial.write(b'\r')
-    clean_buffer(serial)
-    time.sleep(1)
-    serial.write(b'~\r')
-    time.sleep(0.5)
-    print('Manual end')
+	serial.write(b'\r')
+	#clean_buffer(serial)
+	serial.write(b'~\r')
+	time.sleep(0.05)
+
 	
-def manual_move(ser, axes,buttons):
-	joystick=axes
-	buttons=buttons
+def update_velocity(serial, axes, previous_high_speed):
+	high_speed=20
+	low_speed=10
+	current_high_speed=False
+	for axe in axes[0:-3]:
+		if abs(axe)>0.8:
+			current_high_speed=True
+	
+	if current_high_speed and not previous_high_speed:
+		serial.write(b's \r')
+		time.sleep(0.1)
+		serial.write(f'{high_speed} \r'.encode('utf-8'))
+		print('High speed')
+	elif not current_high_speed and  previous_high_speed:
+		serial.write(b's \r')
+		time.sleep(0.1)
+		serial.write(f'{low_speed} \r'.encode('utf-8'))
+		print('Low speed')
+	
+	return current_high_speed
 
-	if joystick[0] < -0.2:
-		ser.write(b'1 \r')
 
-	elif joystick[0] > 0.2:
+def manual_move(ser, axes,buttons,previous_high_speed ):
+	current_high_speed=update_velocity(ser, axes, previous_high_speed)
+	
+	if axes[1] < -0.2:
 		ser.write(b'Q \r')
 
-	if joystick[1] < -0.2:
+	elif axes[1] > 0.2:
+		ser.write(b'1 \r')
+
+	if axes[0] < -0.2:
 		ser.write(b'2 \r')
 
-	elif joystick[1] > 0.2:
+	elif axes[0] > 0.2:
 		ser.write(b'W \r')
-          
+
+	if axes[2] < -0.2:
+		ser.write(b'4 \r')
+
+	elif axes[2] > 0.2:
+		ser.write(b'R \r')
+
+	if axes[3] < -0.2:
+		ser.write(b'T \r')
+
+	elif axes[3] > 0.2:
+		ser.write(b'5 \r')
+	
+	if buttons[9] ==1:
+		ser.write(b'3 \r')
+
+	elif buttons[10] ==1:
+		ser.write(b'E \r') 
+	return current_high_speed
+
 def initialize_joystick():
 	# Initialize Pygame
 	pygame.init()
@@ -296,7 +340,8 @@ def get_joystick(joystick):
 			axes[i]=0
 	return axes, buttons, quit
 
-
+def do_something():
+	return None
 def main():
 	joystick = initialize_joystick()
 	FPS=40
@@ -304,7 +349,9 @@ def main():
 	bisturi_robot=Robot('COM4',5, -200, 5, 'bisturi')
 	serBisturi=bisturi_robot.get_serial()
 	robots=[bisturi_robot]
-	manual_start(serBisturi)
+	count=0
+	initial_manual_start(serBisturi)
+	current_high_speed=False
 	try:
 		while True:
 		# Handle events
@@ -312,14 +359,23 @@ def main():
 				axes, buttons, quit = get_joystick(joystick)
 			if quit:
 				return
-			manual_move(serBisturi,axes,buttons)
+			if count> FPS:
+				count=0
+				manual_end(serBisturi)
+				do_something()
+				manual_start_midle(serBisturi)
+
+			
+			count+=1
+			current_high_speed = manual_move(serBisturi,axes,buttons, current_high_speed)
 			clock.tick(FPS)
 	
 	except KeyboardInterrupt:
 		pass
 	finally:
-		manual_end(serBisturi)
 		pygame.quit()
+		manual_end(serBisturi)
+
 		for robot in robots:
 			robot.housekeeping()
 
