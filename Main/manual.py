@@ -300,7 +300,7 @@ def computer_comunication_loop(sharedData):
 		oldData=sharedData
 		SendString=''
 		for data in oldData:
-			SendString	+=str(data)
+			SendString	+=f'{str(data)} \n'
 		serialOtherComputer.write(f'{SendString}'.encode('uft-8'))
 		clock.tick(FPS)
 
