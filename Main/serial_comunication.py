@@ -5,7 +5,6 @@ import threading
 import queue
 import math
 
-
 def read_and_wait_original(ser, wait_time):
 #this function reads the information that the robot outputs to the computer and returns it as a string
 		serString = "" # Used to hold data coming over UART
@@ -28,7 +27,6 @@ def read_and_wait_original(ser, wait_time):
 				if deltat>wait_time:
 					flag = False
 		return output	
-
 
 def read_and_wait(ser, wait_time):
 #this function reads the information that the robot outputs to the computer and returns it as a string
@@ -70,7 +68,6 @@ def clean_buffer(ser):
 				#print('buffer clean')
 				break
 
-
 def wait_for_DONE(ser, max_time):	#this functions reads the robot and waits for the Done. to be given
 		start_time=time.time()
 		while not str(read_and_wait(ser,0.5)).find('Done.'):
@@ -81,8 +78,6 @@ def wait_for_DONE(ser, max_time):	#this functions reads the robot and waits for 
 		
 		#print('Done found')
 		return True
-
-
 
 def set_joints(jointDelta_values, ser, typeofcomunication_forDebug):
 	deltas=jointDelta_values[0:5]
@@ -152,11 +147,6 @@ def set_joints(jointDelta_values, ser, typeofcomunication_forDebug):
 				ser.write(printToRobot.encode('utf-8'))
 				done_bool=wait_for_DONE(ser,1)
 			
-
-
-
-
-
 def set_position(position_values, ser): #Try in LAB---
 	deltas=position_values[0:5]
 	coordenates=position_values[5:10]
@@ -170,10 +160,9 @@ def set_position(position_values, ser): #Try in LAB---
 			ser.write(printToRobot.encode('utf-8'))#change for lab ---------HERE FOR LAB
 			time.sleep(0.3)
 
-
 def serial_comunication_loop(shared_queue, ser):
 	typeofcomunication_forDebug=1 #alter in lab
-	
+
 	count=0
 	FPS=5
 	clock_serial = pygame.time.Clock()
@@ -206,7 +195,6 @@ def serial_comunication_loop(shared_queue, ser):
 
 		clock_serial.tick(FPS) # do not run loop faster than n times a second
 
-
 def begin_manual(ser):
 
 	ser.write(b'~ \r') 
@@ -219,9 +207,6 @@ def begin_manual(ser):
 	while not read_and_wait(ser, 0).find('SPEED'):
 		pass
 	ser.write(b'5\r')
-
-
-
 
 def manual_pos(xyzvalues, ser):
 	if xyzvalues[0]>0:
@@ -248,10 +233,6 @@ def manual_pos(xyzvalues, ser):
 	elif xyzvalues[1]<0:
 		ser.write(b'W \r')
 
-
-
-
-
 def manual_comunication_loop(shared_queue, ser):
 	count=0
 	FPS=10
@@ -270,5 +251,4 @@ def manual_comunication_loop(shared_queue, ser):
 
 			count +=1
 			
-
 		clock_serial.tick(FPS) # do not run loop faster than n times a second	
