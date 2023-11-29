@@ -5,6 +5,8 @@ import serial
 import threading
 import queue
 import math
+import os
+os.environ['SDL_JOYSTICK_HIDAPI_PS4_RUMBLE'] = '1' #this enables vibrations of PS4 controller
 
 
 from serial_comunication import read_and_wait, wait_for_DONE, serial_comunication_loop, set_joints
@@ -12,7 +14,7 @@ from Robot_classes import Robot
 from joystick_functions import initialize_joystick, get_joystick
 
 
-def joystickToDeltas_bisturi(axes, buttons, robot, shared_queue):
+def joystickToDeltas_bisturi(axes, buttons, robot, shared_queue, joystick):
 
 
 	""" This function translates joystick inputs to robot change in positions. It is specific to the bisturi robot.
@@ -22,22 +24,29 @@ def joystickToDeltas_bisturi(axes, buttons, robot, shared_queue):
 	The other thread (serial comunication thread) acesses this shared queue and makes the robot move in accordance with the new joint values 
 	"""
 	if buttons[3]==1:
-		robot.set_sensitivity(True) #Change the sensitivity of the robot (between high and low sensitivity) - if triangle is pressed
+		bool_if_changed, sensitivity = robot.set_sensitivity(True) #Change the sensitivity of the robot (between high and low sensitivity) - if triangle is pressed
 
 	else:
 		robot.set_sensitivity(False) #inform robot that triangle button has been depressed
+		bool_if_changed=False
+
+
+	if  bool_if_changed: #this vibrates the controller to let the user know that the sensitivity has  been changed 
+		if sensitivity== 'High':
+			joystick.rumble(0, 0.8, 100)
+		elif sensitivity== 'Low': #Depending on whether sensitivity has become high or low, it vibrates with high or low frequency
+			joystick.rumble(0.8, 0, 100)
 
 	sensitivity = robot.get_sensitivity()
-	
 	x = axes[0]*sensitivity     #x axis controled by horizontal movemento of left analogue
 	y = -axes[1]*sensitivity     #y axis controled by vertical movemento of left analogue
 	pitch = axes[2]*sensitivity # pitch axis controled by horizontal movement of right analogue
-	roll = axes[5]*sensitivity  #roll axis controled by vertical movement of right analogue
+	roll = axes[3]*sensitivity  #roll axis controled by vertical movement of right analogue
 
 	#L2 and R2 triggers to control z position (L2 and R2 are equal to -1 when not pressed. And equal to 1 when pressed)
-	if axes[2]!= -1 and axes[5]== -1: #L2 pressed and R2 not pressed - robot descending
+	if axes[4]!= -1 and axes[5]== -1: #L2 pressed and R2 not pressed - robot descending
 		z= -sensitivity*(axes[2] + 1) /2
-	elif axes[5]!= -1 and axes[2]== -1:#R2 pressed and L2 not pressed - robot ascending
+	elif axes[5]!= -1 and axes[4]== -1:#R2 pressed and L2 not pressed - robot ascending
 		z= sensitivity*(axes[5] + 1) /2  
 	else:
 		z=0
@@ -45,6 +54,8 @@ def joystickToDeltas_bisturi(axes, buttons, robot, shared_queue):
 	#In here, there should be an inverse kinematics function to translate positions to joints
 
 	robot.move_joints([x,y,z,pitch,roll], shared_queue)
+	#robot.move_pos([x,y,z,pitch,roll], shared_queue) #Try in LAB---
+
 	 
 
 def move_2planes_semicircle(pos,x, c, v):
@@ -104,12 +115,12 @@ def joystickToDeltas_camera(axes, buttons, robot, shared_queue):
 
 
 
-def moverobots(axes, buttons, robots, shared_queue):
+def moverobots(axes, buttons, robots, shared_queue, joystick):
 	#this function should: translate joystick movements to actual movements for the robots using inverse and foward kinematics and apply the movement to the robot's class function move(self)
 	#eventually it can also check for colision
 	for i, robot in enumerate(robots):
 		if i ==0:
-			joystickToDeltas_bisturi(axes, buttons,  robot, shared_queue)  #i=0 correspondos to robot 0 - robot with bisturi
+			joystickToDeltas_bisturi(axes, buttons,  robot, shared_queue, joystick)  #i=0 correspondos to robot 0 - robot with bisturi
 		elif i==1:
 			joystickToDeltas_camera(axes, buttons,  robot, shared_queue)  #i=1 correspondos to robot 1 - robot with camera
 
@@ -130,7 +141,7 @@ def joystick_loop(shared_queue, robots):
 			#print('Joystick values: \n', axes)
 			count += 1
 			
-			moverobots(axes, buttons, robots, shared_queue) #this function should: translate joystick movements to actual movements for the robots using inverse and foward kinematics and update the shared_queue with new joint values
+			moverobots(axes, buttons, robots, shared_queue, joystick) #this function should: translate joystick movements to actual movements for the robots using inverse and foward kinematics and update the shared_queue with new joint values
 			
 			joystickLoopClock.tick(FPS) # do not run loop faster than n times a second
 
@@ -141,12 +152,11 @@ def joystick_loop(shared_queue, robots):
 		pygame.quit()
 		for robot in robots:
 			robot.housekeeping()
-		exit()
 
 
 	
 def main():
-	bisturi_robot=Robot('COM4',15, 50, 5, 'bisturi') #robot speed and sensitivity values high and low for robot movement
+	bisturi_robot=Robot('COM4',5, -200, 5, 'bisturi') #robot speed and sensitivity values high and low for robot movement
 	robots=[bisturi_robot] #eventually this list will have both the bisturi and camera robot
 	serBisturi=bisturi_robot.get_serial()
 	shared_queue = queue.Queue() #this queue will save values for the robot's joint deltas
@@ -158,6 +168,7 @@ def main():
 	bisturi_serial_thread.start()
 	
 	joystick_thread.join() #this ensures that the main function only stops when the joystick loop thread is done running. This function should only end after the housekeeping of the robots
+	bisturi_serial_thread.join()
 
 
 if __name__ == "__main__":

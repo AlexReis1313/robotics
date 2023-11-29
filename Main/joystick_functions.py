@@ -23,8 +23,8 @@ def initialize_joystick():
 	
 
 def get_joystick(joystick):
-	buttons=buttons_aux=[0 for i in range(16)]
-	axes=[0 for i in range(6)]
+	buttons=buttons_aux=[0]*16
+	axes=[0]*6
 	aux=0
 	quit=False
 	for event in pygame.event.get():
@@ -35,7 +35,6 @@ def get_joystick(joystick):
 		# Get gamepad input
 		axes = [round(joystick.get_axis(i),3)+axes[i] for i in range(joystick.get_numaxes())]
 		buttons_aux = [joystick.get_button(i) + buttons_aux[i] for i in range(joystick.get_numbuttons())]
-			
 	for i, button in enumerate(buttons_aux):
 		if button>0:
 			buttons[i]=1
@@ -46,5 +45,4 @@ def get_joystick(joystick):
 			axes[i]=round(axe_true,3)
 		else:
 			axes[i]=0
-
 	return axes, buttons, quit

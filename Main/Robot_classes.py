@@ -5,16 +5,24 @@ import threading
 import queue
 import math
 
-from serial_comunication import read_and_wait, wait_for_DONE, serial_comunication_loop, set_joints
+from serial_comunication import read_and_wait_original, read_and_wait, wait_for_DONE, serial_comunication_loop, set_joints
 
 class Robot():
-	def __init__(self, comPort, robotSpeed, sensitivityHigh, sensitivityLow):
+	def __init__(self, comPort, robotSpeed, sensitivityHigh, sensitivityLow, robot_type):
 		#initialization of the robot class
 		#this function opens the serial connection between the robot and the computer, defined the robot's speed % and calibrates the robot
-		self.ser = serial.Serial(comPort, baudrate=9600, bytesize=8, timeout=2, parity='N', xonxoff=0)
+		
+		self.ser = serial.Serial(comPort, baudrate=9600, bytesize=8, timeout=2, parity='N', xonxoff=0) #change for lab ------------------------HERE FOR LAB
 		print("COM port in use: {0}".format(self.ser.name))
+		time.sleep(5)
 		self.ser.write(f'Speed {robotSpeed}\r'.encode('utf-8'))
-		self.calibrate() 
+		self.calibrate(robot_type) 
+		
+		""" 
+		self.ser=comPort # HERE FOR Home--------------------------------------------------
+		self.calibratedPos=[0,0,0,0,0]
+		self.joints=[0,0,0,0,0]
+		 """
 		self.pos = self.calibratedPos
 		self.sensitivity = sensitivityHigh
 		self.otherSensitivity= sensitivityLow
@@ -50,18 +58,20 @@ class Robot():
 	
 	def set_sensitivity(self, buttonPressed):
 		if self.triangle_Pressed and buttonPressed: #triangle was pressed and still is - no changes to sensitivity
-			return None
+			return False, None
 		elif not self.triangle_Pressed and buttonPressed: #triangle was not pressed and now is pressed - change sensitivity from Low to high or High to low
 			self.sensitivity , self.otherSensitivity  = self.otherSensitivity,  self.sensitivity
 			self.triangle_Pressed=True
 			
-			auxiliar= bool(self.sensitivity >self.otherSensitivity )
+			
 			print('Sensitivity changed')
-			if auxiliar:
+			if self.sensitivity >self.otherSensitivity:
 				print('high')
+				sensitivity = 'High'
 			else:
-				print('low')
-
+				print('Low')
+				sensitivity = 'Low'
+			return True, sensitivity
 		else: 
 			self.triangle_Pressed=False #button is not pressed - prepare to change sensitivity when button is pressed again
 
@@ -74,10 +84,10 @@ class Robot():
 		#self.ser.write(b'HERE AA \r')
 		#read_and_wait(0.3)
 		# self.ser.write(b'LISTPV P1 \r')
-		read_and_wait(0.4)
+		read_and_wait_original(self.ser, 0.4)
 		self.ser.write(b'LISTPV POSITION \r')
 
-		robot_output = read_and_wait(1)
+		robot_output = read_and_wait_original(self.ser,1)
 		output_after = robot_output.replace(': ', ':')
 		pairs=(output_after.split())[2:-1] #separate in pairs of the form 'n:m'
 		result_list=[]
@@ -121,6 +131,19 @@ class Robot():
 		Threshold = 1
 		if deltasum>Threshold:
 			shared_queue.put(putInQueue)
+
+	def move_pos(self, PosDeltas,shared_queue ):#Try in LAB---
+		self.pos = [self.pos[i] + PosDeltas[i] for i in range(len(PosDeltas))]
+		putInQueue = PosDeltas + self.pos #this concatenates in a list with 10 values
+		
+		#to put pos values in queue - checking first if the values are not null
+		deltasum=0
+		for delta in PosDeltas:
+			deltasum+=pow(delta,2) #sum of squared values
+
+		Threshold = 1
+		if deltasum>Threshold:
+			shared_queue.put(putInQueue)	
 
 
 def cameraRobot(Robot):

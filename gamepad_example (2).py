@@ -1,6 +1,8 @@
 import pygame
 import sys
 import math
+import os
+os.environ['SDL_JOYSTICK_HIDAPI_PS4_RUMBLE'] = '1'
 
 def get_joystick(joystick):
 	buttons=buttons_aux=[0 for i in range(16)]
@@ -20,8 +22,9 @@ def get_joystick(joystick):
 		if button>0:
 			buttons[i]=1
 
+	denominator = max(1, aux)  
 	for i, axe in enumerate(axes):
-		axe_true=axe/(max(1,aux))
+		axe_true=axe/denominator
 		if abs(axe_true) > 0.2:
 			axes[i]=round(axe_true,3)
 		else:
@@ -81,7 +84,10 @@ def main():
 			# Process input
 			print(f"Axes: {axes}")
 			print(f"Buttons: {buttons}")
-			clock.tick(10)
+			if buttons[2]==1:
+				print(joystick.rumble(0, 0.6, 50))
+
+			clock.tick(3)
 
 	except KeyboardInterrupt:
 		pass
