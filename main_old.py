@@ -244,7 +244,6 @@ def main():
 				pygame.event.clear()
 				clock.tick(5) # do not run loop faster than 5 times a second
 
-		
 
 	except KeyboardInterrupt:
 		pass

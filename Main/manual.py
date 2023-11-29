@@ -5,182 +5,186 @@ import threading
 import queue
 import math
 
+
+from joystick_functions import initialize_joystick, get_joystick
+
 class Robot():
-	def __init__(self, comPort, robotSpeed, sensitivityHigh, sensitivityLow, robot_type):
+	def __init__(self, joystick,FPS, comPort='COM4', speedHigh=30, speedLow=5):
 		#initialization of the robot class
 		#this function opens the serial connection between the robot and the computer, defined the robot's speed % and calibrates the robot
 		
 		self.ser = serial.Serial(comPort, baudrate=9600, bytesize=8, timeout=2, parity='N', xonxoff=0) #change for lab ------------------------HERE FOR LAB
-		print("COM port in use: {0}".format(self.ser.name))
-		""" time.sleep(5)
-		self.ser.write(f'Speed {robotSpeed}\r'.encode('utf-8'))
-		self.calibrate(robot_type) 
+		print("COM port in use: {0}".format(self.ser.name))		
+
+		self.initial_manual_start()
 		
-		 
-		self.ser=comPort # HERE FOR Home--------------------------------------------------
-		self.calibratedPos=[0,0,0,0,0]
-		self.joints=[0,0,0,0,0]
-		
-		self.pos = self.calibratedPos
-		self.sensitivity = sensitivityHigh
-		self.otherSensitivity= sensitivityLow
+		#Statements to use in the function update_speed
+		self.speed=self.speedLow = speedLow
+		self.speedHigh=speedHigh
+		self.previousHighSpeed=False
+		self.joystick = joystick
 		self.triangle_Pressed=False
-		 """
+
+		while not self.calibrate(FPS): #this loop's condition runs the calibration function. If it returns True, the loop interior is never called
+			self.manual_end()
+			print('Try calibration again') 
 
 
 	def get_serial(self):
 		return self.ser
 
-	def calibrate (self, robot_type):	#function that is used to calibrate the robot in the begging of running the program
-		print('Move the robot arm to the calibration position. Use the Teach Pendent')
-		if robot_type =='bisturi':
-			input_String="Input 'y' when ready to calibrate (when the end effector is in the calibration position)"
-		elif robot_type =='camera':
-			input_String="Input 'y' when ready to calibrate (the end effector position should be vertically alligned with the jello)"
+	def calibrate (self, FPS):	#function that is used to calibrate the robot in the begging of running the program
+		CalibrationClock = pygame.time.Clock()
+		print('Move the robot arm to the calibration position. Use the Joystick.\n', 'Click x when in calibration position')
+		try:
+			while True:
+				# Handle events
+				if pygame.event.peek(): #if there are events waiting in joystick queue
+					axes, buttons, quit = get_joystick(self.joystick)
+	
+				if quit:
+					return False #Calibration failed
+				
+				if buttons[0]: #x button pressed
+					print('Calibration concluded with success')
+					self.manual_end()
+					self.calculate_pos()
+					self.manual_start_midle()
+					self.calibratedPos = self.pos
+					return True #Calibration ended
+				
+				self.manual_move(axes,buttons)
+				CalibrationClock.tick(FPS)
+		
+		except KeyboardInterrupt:
+			return False #Calibration Failed
+		
 
-		while True:
-			if 'y'==input(input_String):
-				self.ser.write(b'HERE AA \r')
-				self.calculate_pos()
-				self.calibratedPos = self.get_pos()
-				print('Calibration Finished')
-				break
-			
+	def initial_manual_start(self):
+		self.ser.write(b'\r')
+		self.ser.write(b'~ \r')
+		self.ser.write(b's \r')
+		self.ser.write(f'{self.speed} \r'.encode('utf-8'))
+		self.ser.write(b'X \r')
+		time.sleep(0.1)
+
+	def manual_start_midle(self):
+		self.ser.write(b'\r')
+		self.ser.write(b'~ \r')
+		self.ser.write(b's \r')
+		self.ser.write(f'{self.speed} \r'.encode('utf-8'))
+		time.sleep(0.05)
+
+	def manual_end(self):
+		self.ser.write(b'\r')
+		#clean_buffer(serial)
+		self.ser.write(b'~\r')
+		time.sleep(0.05)
+
 	def get_calibrationPos(self):#return calibration position
 		#this function can be used when evaluating if the robot is going to colide with something. by returning the initial calibration position
 		#for example, to check if a new position of the robot will make it colide with the table, we can check if the z axis of that position if some cm lower than the calibration positon z axis
 		return self.calibratedPos
 	
-	def get_sensitivity(self):
-		return self.sensitivity
+	def get_speed(self):
+		return self.speed
 	
-	def set_sensitivity(self, buttonPressed):
-		if self.triangle_Pressed and buttonPressed: #triangle was pressed and still is - no changes to sensitivity
-			return False, None
-		elif not self.triangle_Pressed and buttonPressed: #triangle was not pressed and now is pressed - change sensitivity from Low to high or High to low
-			self.sensitivity , self.otherSensitivity  = self.otherSensitivity,  self.sensitivity
-			self.triangle_Pressed=True
-			
-			
-			print('Sensitivity changed')
-			if self.sensitivity >self.otherSensitivity:
-				print('high')
-				sensitivity = 'High'
-			else:
-				print('Low')
-				sensitivity = 'Low'
-			return True, sensitivity
+	def update_speed(self, button_Is_Pressed):
+		if self.triangle_Pressed and button_Is_Pressed: #triangle was pressed and still is - no changes to sensitivity
+			return None
+		elif not self.triangle_Pressed and button_Is_Pressed: #triangle was not pressed and now is pressed - change sensitivity from Low to high or High to low
+			if not self.previousHighSpeed: #robot was previously with low speed - and will now have high speed
+				self.ser.write(b's \r')
+				time.sleep(0.1)
+				self.ser.write(f'{self.speedHigh} \r'.encode('utf-8'))
+				self.previousHighSpeed = True
+				self.joystick.rumble(0, 0.8, 100)
+				print('High speed')
+
+			else: #robot was previously with high speed and will now have low speed
+				self.ser.write(b's \r')
+				time.sleep(0.1)
+				self.ser.write(f'{self.speedLow} \r'.encode('utf-8'))
+				self.previousHighSpeed = False
+				self.joystick.rumble(0.8, 0, 100)
+				print('Low speed')
 		else: 
 			self.triangle_Pressed=False #button is not pressed - prepare to change sensitivity when button is pressed again
+
+
+	def manual_move(self, axes,buttons ):
+		self.update_speed(buttons[3]) #change speed if triange is pressed
+		
+		if axes[1] < -0.2:
+			self.ser.write(b'Q \r')
+
+		elif axes[1] > 0.2:
+			self.ser.write(b'1 \r')
+
+		if axes[0] < -0.2:
+			self.ser.write(b'2 \r')
+
+		elif axes[0] > 0.2:
+			self.ser.write(b'W \r')
+
+		if axes[2] < -0.2:
+			self.ser.write(b'4 \r')
+
+		elif axes[2] > 0.2:
+			self.ser.write(b'R \r')
+
+		if axes[3] < -0.2:
+			self.ser.write(b'T \r')
+
+		elif axes[3] > 0.2:
+			self.ser.write(b'5 \r')
+		
+		if buttons[9] ==1:
+			self.ser.write(b'3 \r')
+
+		elif buttons[10] ==1:
+			self.ser.write(b'E \r') 
 
 	def go_home(self):
 		self.ser.write(b'home\r')
 		time.sleep(180) # homing takes a few minutes ...
 	
 	def calculate_pos(self):
-		#save the current robot position as P1 and ask it for the axis and joint coordinates of P1
-		#self.ser.write(b'HERE AA \r')
-		#read_and_wait(0.3)
-		# self.ser.write(b'LISTPV P1 \r')
-		read_and_wait_original(self.ser, 0.4)
+	
+		clean_buffer(self.ser)
 		self.ser.write(b'LISTPV POSITION \r')
-
-		robot_output = read_and_wait_original(self.ser,1)
+		robot_output = read_and_wait(self.ser,0.2)
 		output_after = robot_output.replace(': ', ':')
 		pairs=(output_after.split())[2:-1] #separate in pairs of the form 'n:m'
 		result_list=[]
-		print(pairs)
 		for pair in pairs:
 			[key, value] = pair.split(':')
 			result_list.append(int(value))
 		self.joints = result_list[0:5]
 		self.pos = result_list[5:10] 
-
 		print('Calculate pos: ', self.pos)
 
 
-	def get_pos(self):
+	def get_last_pos(self):
 		#function to get axis position values
 		#run calculate_pos before running get_pos to update the values
 		return self.pos
 
-	def get_joints(self):
+	def get_last_joints(self):
 		#function to get joint values
 		#run calculate_pos before running get_joints to update the joint values
 		return self.joints
 	
 	def housekeeping(self):
+		self.manual_end()
+		time.sleep(0.5)
 		self.ser.close()
 		print('housekeeping completed - exiting')	
 		
-	def move_joints(self,JointsDeltas, shared_queue ):
-		 #for this function to work, 'JointsDelts' should come from an inverse kinematics function. 
-        #this can be used instead of using move_axis. Move axis takes a position and move joints takes new joint values for each of the robot's movement
-        #when a good inverse kinematics function is created, move_joints should give better results than move_axis
-		#print('Old joints: ',self.joints)
-		#print('Deltas joints: ', JointsDeltas)
-		self.joints = [self.joints[i] + JointsDeltas[i] for i in range(len(JointsDeltas))]
-		putInQueue = JointsDeltas + self.joints #this concatenates in a list with 10 values
-		
-		#to put joint values in queue - checking first if the values are not null
-		deltasum=0
-		for delta in JointsDeltas:
-			deltasum+=pow(delta,2) #sum of squared values
-		Threshold = 1
-		if deltasum>Threshold:
-			shared_queue.put(putInQueue)
-
-	def move_pos(self, PosDeltas,shared_queue ):#Try in LAB---
-		self.pos = [self.pos[i] + PosDeltas[i] for i in range(len(PosDeltas))]
-		putInQueue = PosDeltas + self.pos #this concatenates in a list with 10 values
-		
-		#to put pos values in queue - checking first if the values are not null
-		deltasum=0
-		for delta in PosDeltas:
-			deltasum+=pow(delta,2) #sum of squared values
-
-		Threshold = 1
-		if deltasum>Threshold:
-			shared_queue.put(putInQueue)	
 
 
-def cameraRobot(Robot):
-	#This is a child class of the class Robot. This means that it has all the methods and variables that the Robot class has, 
-	#but with added methods specific to the camera robor
-	def __init__(self, comPort, robotSpeed, sensitivityHigh, sensitivityLow):
-		super(cameraRobot, self).__init__(self, comPort, robotSpeed, sensitivityHigh, sensitivityLow, 'camera') #inherite all methods from robot and do the init function of rthe robot class
-		self.c= self.pos[2] #c=Z initial
-		self.v=(c*((1/3) + (math.pi/6))) + self.pos[1] #v = equation + y
 
-	def change_c(self, delta_c):
-		self.c+= 10
-
-	def get_c(self):
-		return self.c
-	
-	def change_v(self, delta_v):
-		self.v+=delta_v
-		if self.v> self.c*(4/3+ math.pi/6):
-			self.v = self.c*(4/3+ math.pi/6)
-		elif self.v<0:
-			self.v=0
-
-	def get_v(self):
-		return self.v
-	
-	def move_pos(self, new_pos, delta_pos , shared_queue):
-		self.pos = new_pos
-		putInQueue = delta_pos + self.pos #this concatenates in a list with 10 values
-		
-		#to put joint values in queue - checking first if the values are not null
-		deltasum=0
-		for delta in delta_pos:
-			deltasum+=pow(delta,2) #sum of squared values
-		Threshold = 1
-		if deltasum>Threshold:
-			shared_queue.put(putInQueue)
-
-def read_and_wait_original(ser, wait_time):
+def read_and_wait(ser, wait_time):
     #this function reads the information that the robot outputs to the computer and returns it as a string
     serString = "" # Used to hold data coming over UART
     output = ""
@@ -204,154 +208,34 @@ def read_and_wait_original(ser, wait_time):
     return output
 
 def clean_buffer(ser):
-    #this function reads the information that the robot outputs to the computer and returns it as a string
-    #Used to hold data coming over UART
     flag = True
     while flag:
-        # Wait until there is data waiting in the serial buffer
         if ser.in_waiting > 0:
-            # Read data out of the buffer until a carriage return / new line is found
-            ser.readline()
-            # Print the contents of the serial data
-            
+            ser.readline()          
         else:
-            #print('buffer clean')
             break   
 
-def initial_manual_start(serial):
-	serial.write(b'\r')
-	serial.write(b'~ \r')
-	serial.write(b's \r')
-	#speed=update_velocity(axes)
-	speed=15
-	serial.write(f'{speed} \r'.encode('utf-8'))
-	serial.write(b'X \r')
-	time.sleep(0.1)
-
-def manual_start_midle(serial):
-	serial.write(b'\r')
-	serial.write(b'~ \r')
-	serial.write(b's \r')
-	#speed=update_velocity(axes)
-	speed=30
-	serial.write(f'{speed} \r'.encode('utf-8'))
-	time.sleep(0.05)
-
-def manual_end(serial):
-	serial.write(b'\r')
-	#clean_buffer(serial)
-	serial.write(b'~\r')
-	time.sleep(0.05)
-
-	
-def update_velocity(serial, axes, previous_high_speed):
-	high_speed=20
-	low_speed=10
-	current_high_speed=False
-	for axe in axes[0:-3]:
-		if abs(axe)>0.8:
-			current_high_speed=True
-	
-	if current_high_speed and not previous_high_speed:
-		serial.write(b's \r')
-		time.sleep(0.1)
-		serial.write(f'{high_speed} \r'.encode('utf-8'))
-		print('High speed')
-	elif not current_high_speed and  previous_high_speed:
-		serial.write(b's \r')
-		time.sleep(0.1)
-		serial.write(f'{low_speed} \r'.encode('utf-8'))
-		print('Low speed')
-	
-	return current_high_speed
 
 
-def manual_move(ser, axes,buttons,previous_high_speed ):
-	current_high_speed=update_velocity(ser, axes, previous_high_speed)
-	
-	if axes[1] < -0.2:
-		ser.write(b'Q \r')
 
-	elif axes[1] > 0.2:
-		ser.write(b'1 \r')
 
-	if axes[0] < -0.2:
-		ser.write(b'2 \r')
+def do_obstacle_avoidance(robot):
+	robot.calculate_pos()
+	position = robot.get_last_pos()
+	calibration_pos = robot.get_calibrationPos()
 
-	elif axes[0] > 0.2:
-		ser.write(b'W \r')
 
-	if axes[2] < -0.2:
-		ser.write(b'4 \r')
+	#this function should then do obstacle avoindace. This has not yet been done
 
-	elif axes[2] > 0.2:
-		ser.write(b'R \r')
-
-	if axes[3] < -0.2:
-		ser.write(b'T \r')
-
-	elif axes[3] > 0.2:
-		ser.write(b'5 \r')
-	
-	if buttons[9] ==1:
-		ser.write(b'3 \r')
-
-	elif buttons[10] ==1:
-		ser.write(b'E \r') 
-	return current_high_speed
-
-def initialize_joystick():
-	# Initialize Pygame
-	pygame.init()
-	# Initialize the gamepad
-	pygame.joystick.init()
-	# Check if any joystick/gamepad is connected
-	if pygame.joystick.get_count() == 0:
-		print("No gamepad found.")
-		return
-    # Initialize the first gamepad
-	joystick = pygame.joystick.Joystick(0)
-	joystick.init()
-	print(f"Gamepad Name: {joystick.get_name()}")
-	return joystick
-
-def get_joystick(joystick):
-	buttons=buttons_aux=[0]*16
-	axes=[0]*6
-	aux=0
-	quit=False
-	for event in pygame.event.get():
-		aux+=1
-		if event.type == pygame.QUIT:
-			quit=True
-				
-		# Get gamepad input
-		axes = [round(joystick.get_axis(i),3)+axes[i] for i in range(joystick.get_numaxes())]
-		buttons_aux = [joystick.get_button(i) + buttons_aux[i] for i in range(joystick.get_numbuttons())]
-	for i, button in enumerate(buttons_aux):
-		if button>0:
-			buttons[i]=1
-
-	for i, axe in enumerate(axes):
-		axe_true=axe/(max(1,aux))
-		if abs(axe_true) > 0.2:
-			axes[i]=round(axe_true,3)
-		else:
-			axes[i]=0
-	return axes, buttons, quit
-
-def do_something():
 	return None
+
 def main():
 	joystick = initialize_joystick()
 	FPS=40
 	clock = pygame.time.Clock()
-	bisturi_robot=Robot('COM4',5, -200, 5, 'bisturi')
-	serBisturi=bisturi_robot.get_serial()
+	bisturi_robot=Robot(joystick,FPS)
 	robots=[bisturi_robot]
 	count=0
-	initial_manual_start(serBisturi)
-	current_high_speed=False
 	try:
 		while True:
 		# Handle events
@@ -361,23 +245,20 @@ def main():
 				return
 			if count> FPS:
 				count=0
-				manual_end(serBisturi)
-				do_something()
-				manual_start_midle(serBisturi)
+				bisturi_robot.manual_end()
+				do_obstacle_avoidance(bisturi_robot)
+				bisturi_robot.manual_start_midle()
 
-			
 			count+=1
-			current_high_speed = manual_move(serBisturi,axes,buttons, current_high_speed)
+			bisturi_robot.manual_move(axes,buttons)
 			clock.tick(FPS)
 	
 	except KeyboardInterrupt:
 		pass
 	finally:
 		pygame.quit()
-		manual_end(serBisturi)
-
 		for robot in robots:
-			robot.housekeeping()
+			robot.housekeeping() #this ends the manual mode and closes the serial port
 
 
 if __name__ == "__main__":
