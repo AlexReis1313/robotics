@@ -9,13 +9,12 @@ import math
 from joystick_functions import initialize_joystick, get_joystick
 
 class Robot():
-	def __init__(self, joystick,FPS,sharedData, comPort='COM4', speedHigh=30, speedLow=5):
+	def __init__(self, joystick,FPS,sharedData, comPort='COM4', speedHigh=20, speedLow=10):
 		#initialization of the robot class
 		#this function opens the serial connection between the robot and the computer, defined the robot's speed % and calibrates the robot
 		
 		self.ser = serial.Serial(comPort, baudrate=9600, bytesize=8, timeout=2, parity='N', xonxoff=0) #change for lab ------------------------HERE FOR LAB
 		print("COM port in use: {0}".format(self.ser.name))		
-		self.initial_manual_start()
 
 		#for the function that shares information with other computer
 		self.sharedData=sharedData 
@@ -29,11 +28,12 @@ class Robot():
 		self.previousHighSpeed=False
 		self.joystick = joystick
 		self.triangle_Pressed=False
+		self.initial_manual_start()
 
 		while not self.calibrate(FPS): #this loop's condition runs the calibration function. If it returns True, the loop interior is never called
 			self.manual_end()
 			print('Try calibration again') 
-
+		#mudar isto paraaceitar keyboardInterrupt
 
 	def get_serial(self):
 		return self.ser
@@ -56,7 +56,7 @@ class Robot():
 					self.calculate_pos()
 					self.manual_start_midle()
 					
-					self.sharedData[0]= self.calibratedPos = self.pos
+					#self.sharedData[0]= self.calibratedPos = self.pos
 
 					return True #Calibration ended
 				
@@ -80,13 +80,15 @@ class Robot():
 		self.ser.write(b'~ \r')
 		self.ser.write(b's \r')
 		self.ser.write(f'{self.speed} \r'.encode('utf-8'))
-		time.sleep(0.05)
+		#time.sleep(0.05)
 
 	def manual_end(self):
 		self.ser.write(b'\r')
 		#clean_buffer(serial)
 		self.ser.write(b'~\r')
 		time.sleep(0.05)
+		self.ser.write(b'\r')
+
 
 	def get_calibrationPos(self):#return calibration position
 		#this function can be used when evaluating if the robot is going to colide with something. by returning the initial calibration position
@@ -98,27 +100,40 @@ class Robot():
 	
 	def update_speed(self, button_Is_Pressed):
 		if self.triangle_Pressed and button_Is_Pressed: #triangle was pressed and still is - no changes to sensitivity
-			return None
+			return False
 		elif not self.triangle_Pressed and button_Is_Pressed: #triangle was not pressed and now is pressed - change sensitivity from Low to high or High to low
 			if not self.previousHighSpeed: #robot was previously with low speed - and will now have high speed
+				#self.ser.write(b'\r')
 				self.ser.write(b's \r')
-				time.sleep(0.1)
+				time.sleep(0.2)
 				self.ser.write(f'{self.speedHigh} \r'.encode('utf-8'))
+				time.sleep(0.1)
+				self.ser.write(b'\r')
 				self.previousHighSpeed = True
 				self.joystick.rumble(0, 0.8, 100)
 				self.sharedData[0]='Speed High'
 				print('High speed')
+				self.ser.write(b'C\r')
+
 
 			else: #robot was previously with high speed and will now have low speed
+				#self.ser.write(b'\r')
 				self.ser.write(b's \r')
-				time.sleep(0.1)
+				time.sleep(0.2)
 				self.ser.write(f'{self.speedLow} \r'.encode('utf-8'))
+				time.sleep(0.1)
+				self.ser.write(b'\r')
 				self.previousHighSpeed = False
 				self.joystick.rumble(0.8, 0, 100)
 				self.sharedData[0]='Speed Low'
 				print('Low speed')
+				self.ser.write(b'C\r')
+
+			self.triangle_Pressed=True
+			return True
 		else: 
 			self.triangle_Pressed=False #button is not pressed - prepare to change sensitivity when button is pressed again
+			return False
 
 	def share_information(self, circleButton):
 		if not circleButton: #circle is not pressed
@@ -141,8 +156,8 @@ class Robot():
 
 	def manual_move(self, axes,buttons ):
 		
-		self.update_speed(buttons[3]) #change speed if triange is pressed
-				
+		move_bool = self.update_speed(buttons[3]) #change speed if triange is pressed
+		
 		if axes[1] < -0.2:
 			self.ser.write(b'Q \r')
 
@@ -179,18 +194,18 @@ class Robot():
 	
 	def calculate_pos(self):
 	
-		clean_buffer(self.ser)
 		self.ser.write(b'LISTPV POSITION \r')
-		robot_output = read_and_wait(self.ser,0.2)
-		output_after = robot_output.replace(': ', ':')
-		pairs=(output_after.split())[2:-1] #separate in pairs of the form 'n:m'
+		time.sleep(0.05)
+		clean_buffer(self.ser)
+		robot_output = read_and_wait(self.ser,0.15)
+		output_after = robot_output.replace(': ', ':').replace('>','')
+		pairs=output_after.split() #separate in pairs of the form 'n:m'
 		result_list=[]
 		for pair in pairs:
 			[key, value] = pair.split(':')
 			result_list.append(int(value))
 		self.joints = result_list[0:5]
 		self.pos = result_list[5:10] 
-		print('Calculate pos: ', self.pos)
 
 
 	def get_last_pos(self):
@@ -252,13 +267,14 @@ def share_data_computers(buttons, robot, sharedData):
 
 def do_obstacle_avoidance(robot, sharedData):
 	robot.calculate_pos()
-	sharedData[1] = robot.get_last_pos()
+	#sharedData[1] = robot.get_last_pos()
 
 	#this function should then do obstacle avoindace. This has not yet been done
 
 	return None
 
-def robot_controll_main_loop(sharedData):
+def robot_controll_main_loop():
+	sharedData=[0]
 	joystick = initialize_joystick()
 	FPS=40
 	clock = pygame.time.Clock()
@@ -278,7 +294,7 @@ def robot_controll_main_loop(sharedData):
 				do_obstacle_avoidance(bisturi_robot, sharedData)
 				bisturi_robot.manual_start_midle()
 
-			share_data_computers(buttons,bisturi_robot ,sharedData)
+			#share_data_computers(buttons,bisturi_robot ,sharedData)
 
 			count+=1
 			bisturi_robot.manual_move(axes,buttons)
@@ -306,17 +322,18 @@ def computer_comunication_loop(sharedData):
 
 
 def main():
-	sharedData = []*3
+	sharedData = [[0,0,0,0,0]]
 	
+
 	robot_controll_thread = threading.Thread(target=robot_controll_main_loop, args=(sharedData))
-	computer_comunication_thread = threading.Thread(target=computer_comunication_loop, args=(sharedData))
+	#computer_comunication_thread = threading.Thread(target=computer_comunication_loop, args=(sharedData))
 	
 	robot_controll_thread.start()
-	computer_comunication_thread.start()
+	#computer_comunication_thread.start()
 	
 	robot_controll_thread.join() #this ensures that the main function only stops when the joystick loop thread is done running. This function should only end after the housekeeping of the robots
-	computer_comunication_thread.join()
+	#computer_comunication_thread.join()
 
 if __name__ == "__main__":
-    main()
+    robot_controll_main_loop()
 	
