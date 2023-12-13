@@ -5,6 +5,8 @@ import threading
 import queue
 import math
 
+from joystick_functions import*
+
 def read_and_wait(ser, wait_time):
     #this function reads the information that the robot outputs to the computer and returns it as a string
     serString = "" # Used to hold data coming over UART
@@ -38,7 +40,7 @@ def clean_buffer(ser):
 
 
 class Robot():
-	def __init__(self, joystick,FPS,sharedData, comPort='COM4', speedHigh=20, speedLow=10):
+	def __init__(self, joystick,FPS,info_computer_share, comPort='COM4', speedHigh=20, speedLow=10):
 		#initialization of the robot class
 		#this function opens the serial connection between the robot and the computer, defined the robot's speed % and calibrates the robot
 		
@@ -46,7 +48,7 @@ class Robot():
 		print("COM port in use: {0}".format(self.ser.name))		
 
 		#for the function that shares information with other computer
-		self.sharedData=sharedData 
+		self.info_computer_share= info_computer_share 
 			#List where self.sharedData[0] is the robot's calibration pos, self.sharedData[1] is the current position of the robot,
 			#self.sharedData[2] is if joystick's square button state (to zero the coordenates shown on screen) 
 		self.circle_Pressed = False 
@@ -107,19 +109,25 @@ class Robot():
 			return False #Calibration Failed and exit program
 		
 
-	def initial_manual_start(self):
+	def initial_manual_start(self,  type='J',*speed):
+		if not speed: #if speed argument is not given, use normal speed of robot
+			speed=self.speed
+		
 		self.ser.write(b'\r')
 		self.ser.write(b'~ \r')
 		self.ser.write(b's \r')
-		self.ser.write(f'{self.speed} \r'.encode('utf-8'))
-		self.ser.write(b'X \r')
+		self.ser.write(f'{speed} \r'.encode('utf-8'))
+		self.ser.write(f'{type} \r'.encode('utf-8'))
 		time.sleep(0.1)
 
-	def manual_start_midle(self):
+	def manual_start_midle(self, *speed):
+		if not speed: #if speed argument is not given, use normal speed of robot
+			speed=self.speed
+		
 		self.ser.write(b'\r')
 		self.ser.write(b'~ \r')
 		self.ser.write(b's \r')
-		self.ser.write(f'{self.speed} \r'.encode('utf-8'))
+		self.ser.write(f'{speed} \r'.encode('utf-8'))
 		#time.sleep(0.05)
 
 	def manual_end(self):
@@ -143,31 +151,25 @@ class Robot():
 			return False
 		elif not self.triangle_Pressed and button_Is_Pressed: #triangle was not pressed and now is pressed - change sensitivity from Low to high or High to low
 			if not self.previousHighSpeed: #robot was previously with low speed - and will now have high speed
-				#self.ser.write(b'\r')
-				self.ser.write(b's \r')
-				time.sleep(0.2)
-				self.ser.write(f'{self.speedHigh} \r'.encode('utf-8'))
+				self.manual_end()
 				time.sleep(0.1)
-				self.ser.write(b'\r')
+				self.initial_manual_start(type = 'J', speed=self.speedHigh)
+
 				self.previousHighSpeed = True
 				self.joystick.rumble(0, 0.8, 100)
-				self.sharedData[0]='Speed High'
+				self.info_computer_share['Speed']='Speed High'
 				print('High speed')
-				self.ser.write(b'C\r')
 
 
 			else: #robot was previously with high speed and will now have low speed
-				#self.ser.write(b'\r')
-				self.ser.write(b's \r')
-				time.sleep(0.2)
-				self.ser.write(f'{self.speedLow} \r'.encode('utf-8'))
+				self.manual_end()
 				time.sleep(0.1)
-				self.ser.write(b'\r')
+				self.initial_manual_start(type = 'X', speed=self.speedLow)
+
 				self.previousHighSpeed = False
 				self.joystick.rumble(0.8, 0, 100)
-				self.sharedData[0]='Speed Low'
+				self.info_computer_share['Speed']='Speed Low'
 				print('Low speed')
-				self.ser.write(b'C\r')
 
 			self.triangle_Pressed=True
 			return True
@@ -269,46 +271,25 @@ class cameraRobot():
 		print("COM port in use: {0}".format(self.ser.name))		
 		self.speed=robotSpeed
 		self.shared_camera_pos = shared_camera_pos
-		self.calibrate()
 		self.initial_manual_start()
 
-	def calibrate(self):
-		print('Calibrating Camera Robot \nMove robot so the center of the camera is pointing to the chess pattern \nUse the teach pendent \nClick x when in position')
-		while True:
-			if input('press y when in position')== 'y':
-				print('Calibration in process')
-				self.calculate_pos()
-				break
-		self.calibrated_pos = self.pos
-		self.calibrated_joints = self.joints
-		
- 
-		self.theta = self.get_theta() #left to do
-		self.x_plus_a_Constant = self.pos[0] + (self.pos[2]/math.tan(self.theta))
-		self.radius = (self.pos[2]/math.sin(self.theta))
-
-	def get_theta(self):
-
-		return math.radians(abs(self.pos[3]*0.1))
 	
+
 	def move(self, axes,buttons ):
 		if max(buttons[11:15]):
 			if not self.arrowsPressed: #if some arrow button has just been pressed
 				self.manual_end()
-				if buttons[11]-buttons[12]>0:
-					self.theta += math.pi/20
-				elif buttons[11]-buttons[12]<0:
-					self.theta -= math.pi/20
+				if buttons[11]-buttons[12]>0: #move up - arrow up pressed
+					delta_z=100
+				elif buttons[11]-buttons[12]<0: #move down - arrow down pressed
+					delta_z=-100
 
-				if buttons[13]-buttons[14]>0:
-					self.radius += self.radius * 0.1
-				elif buttons[13]-buttons[14]<0:
-					self.radius -= self.radius * 0.1
+				if buttons[13]-buttons[14]>0: #move backward - arrow left pressed
+					delta_x=100
+				elif buttons[13]-buttons[14]<0:#move foward - arrow right pressed
+					delta_x=-100
 
-				
-				x= self.x_plus_a_Constant - self.radius * math.cos(self.theta)
-				z=self.radius * math.sin(self.theta)
-				new_position = [x, self.pos[1], z,self.pos[3],self.pos[4] ]
+				new_position = [self.pos[0]+delta_x, self.pos[1], self.pos[2]+delta_z, self.pos[3],self.pos[4] ]
 
 				self.set_position(new_position)
 				self.serial_write(b'Move A \r')
@@ -342,8 +323,6 @@ class cameraRobot():
 				print(printToRobot)
 				self.serial_write(printToRobot.encode('utf-8'))
 				time.sleep(0.5)
-
-
 
 
 	def initial_manual_start(self):

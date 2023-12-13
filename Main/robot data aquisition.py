@@ -7,6 +7,8 @@ import math
 import numpy as np
 import random
 
+from joystick_functions import *
+
 def read_and_wait(ser, wait_time):
     #this function reads the information that the robot outputs to the computer and returns it as a string
     serString = "" # Used to hold data coming over UART
@@ -68,47 +70,47 @@ class Robot():
         time.sleep(0.2)
         self.ser.write(b'\r')
 	
-    def manual_move(self,message ):
-        input_random= [0,-1,0,0,0]
+    def manual_move(self,axes, buttons, message ):
     
-        if input_random[1] < -0.2:
+        if axes[1] < -0.2:
             self.ser.write(b'Q \r')
             message['Q']+=1
 
-        elif input_random[1] > 0.2:
+        elif axes[1] > 0.2:
             self.ser.write(b'1 \r')
             message['1']+=1
 
-        if input_random[0] < -0.2:
+        if axes[0] < -0.2:
             self.ser.write(b'2 \r')
             message['2']+=1
 
-        elif input_random[0] > 0.2:
+        elif axes[0] > 0.2:
             self.ser.write(b'W \r')
             message['W']+=1
 
-        if input_random[2] < -0.2:
+        if axes[2] < -0.2:
             self.ser.write(b'4 \r')
 
-        elif input_random[2] > 0.2:
+        elif axes[2] > 0.2:
             self.ser.write(b'R \r')
             message['R']+=1
 
-        if input_random[3] < -0.2:
+        if axes[3] < -0.2:
             self.ser.write(b'T \r')
             message['T']+=1
 
-        elif input_random[3] > 0.2:
+        elif axes[3] > 0.2:
             self.ser.write(b'5 \r')
             message['5']+=1
         
-        if input_random[4] < -0.2:
+        if buttons[9] ==1:
             self.ser.write(b'3 \r')
             message['3']+=1
-
-        elif input_random[4] > 0.2:
+        
+        elif buttons[10] ==1:
             self.ser.write(b'E \r') 
             message['E']+=1
+
         return message
     
     def go_home(self):
@@ -132,7 +134,14 @@ class Robot():
     def get_pos(self):
 		#function to get axis position values
 		#run calculate_pos before running get_pos to update the values
+        print('Getting pos...')
+        self.manual_end()
+        time.sleep(0.3)
         self.calculate_pos()
+        time.sleep(0.3)
+        self.manual_start_midle
+        print('concluded')
+
         return self.pos
     def get_last_joints(self):
 		#function to get joint values
@@ -144,37 +153,52 @@ class Robot():
         time.sleep(0.5)
         self.ser.close()
         print('housekeeping completed - exiting')	
-		
-
+    
 
 def robot_controll_main_loop():
+    joystick = initialize_joystick()
     FPS=40
     clock = pygame.time.Clock()
     bisturi_robot=Robot()
-    count=0
-    robots=[bisturi_robot]
+    
     f=open('Data_robot_movement.txt','w')
+    message= {'Q':0, '1':0,  'W':0,'2':0, 'E':0,'3':0,  'R':0,'4':0, 'T':0,'5':0,}
+    delta_pos=[]
+    initial_pos = bisturi_robot.get_pos()
+    robots=[bisturi_robot]
+    count=0
     try:
-        for k in range(5):
-            delta_pos=[]
-            initial_pos = bisturi_robot.get_pos()
-            message= {'Q':0, '1':0,  'W':0,'2':0, 'E':0,'3':0,  'R':0,'4':0, 'T':0,'5':0,}
-            for i in range(FPS/4):
-                message = bisturi_robot.manual_move(message)
-                count+=1
-                clock.tick(FPS)
-            final_pos = bisturi_robot.get_pos()
-            for i in range(len(initial_pos)):
-                delta_pos.append(final_pos[i]-initial_pos[i])
-            f.write(f'{delta_pos}   {message}\n')
+        while True:
+        
+            # Handle events
+            if pygame.event.peek():  # if there are events waiting in the joystick queue
+                axes, buttons, quit = get_joystick(joystick)
+
+            
+            if count > FPS:  # happens one time each second
+                count = 0
+                final_pos = bisturi_robot.get_pos()
+                for i in range(len(initial_pos)):
+                    delta_pos.append(final_pos[i] - initial_pos[i])
+                if max(delta_pos) > 1 or min(delta_pos) < -1:
+                    f.write(f'{delta_pos}   {message}\n')
+                message = {'Q': 0, '1': 0, 'W': 0, '2': 0, 'E': 0, '3': 0, 'R': 0, '4': 0, 'T': 0, '5': 0}
+                delta_pos = []
+                initial_pos = final_pos
+
+
+            count += 1
+            message = bisturi_robot.manual_move(axes, buttons, message)
             clock.tick(FPS)
-        f.close()
+
     except KeyboardInterrupt:
         pass
     finally:
+        pygame.quit()
         f.close()
+
         for robot in robots:
-            robot.housekeeping() #this ends the manual mode and closes the serial port
+            robot.housekeeping()  # this ends the manual mode and closes the serial port
 
 if __name__ == "__main__":
     robot_controll_main_loop()

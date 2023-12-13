@@ -49,11 +49,10 @@ def camera_robot_loop(joystick_queue, shared_camera_pos):
 
 
 def bisturi_robot_controll_loop(joystick_queue, shared_camera_pos, info_computer_share):
-	sharedData=[0]
 	joystick = initialize_joystick()
 	FPS=40
 	clock = pygame.time.Clock()
-	bisturi_robot=Robot(joystick,FPS, sharedData)
+	bisturi_robot=Robot(joystick,FPS, info_computer_share)
 	
 	robots=[bisturi_robot]
 	count=0

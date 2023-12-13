@@ -43,7 +43,6 @@ def robot_controll_main_loop():
 	FPS=40
 	clock = pygame.time.Clock()
 	bisturi_robot=Robot(joystick,FPS, sharedData)
-	f=open('Data_robot_movement.txt','w')
 
 	robots=[bisturi_robot]
 	count=0
@@ -71,25 +70,10 @@ def robot_controll_main_loop():
 		pass
 	finally:
 		pygame.quit()
-		f.close()
-
 		for robot in robots:
 			robot.housekeeping() #this ends the manual mode and closes the serial port
 
 
-
-def main():
-	sharedData = [[0,0,0,0,0]]
-	
-
-	robot_controll_thread = threading.Thread(target=robot_controll_main_loop, args=(sharedData))
-	#computer_comunication_thread = threading.Thread(target=computer_comunication_loop, args=(sharedData))
-	
-	robot_controll_thread.start()
-	#computer_comunication_thread.start()
-	
-	robot_controll_thread.join() #this ensures that the main function only stops when the joystick loop thread is done running. This function should only end after the housekeeping of the robots
-	#computer_comunication_thread.join()
 
 if __name__ == "__main__":
     camera_robot_loop()
