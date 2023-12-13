@@ -305,24 +305,24 @@ class cameraRobot():
 	
 
 	def move(self, axes,buttons ):
+		self.update_pos(buttons[6])
 		if max(buttons[11:15]):
 			if not self.arrowsPressed: #if some arrow button has just been pressed
 				self.manual_end()
-				delta_z=delta_x=0
 				if buttons[11]-buttons[12]>0: #move up - arrow up pressed
-					delta_z=500
+					delta_z=100
 				elif buttons[11]-buttons[12]<0: #move down - arrow down pressed
-					delta_z=-500
+					delta_z=-100
 
 				if buttons[13]-buttons[14]>0: #move backward - arrow left pressed
-					delta_x=250
+					delta_x=100
 				elif buttons[13]-buttons[14]<0:#move foward - arrow right pressed
-					delta_x=-250
+					delta_x=-100
 
 				new_position = [self.pos[0]+delta_x, self.pos[1], self.pos[2]+delta_z, self.pos[3],self.pos[4] ]
 
 				self.set_position(new_position)
-				self.serial_write(b'Move A 200\r')
+				self.serial_write(b'Move A \r')
 				time.sleep(0.5)
 
 				self.pos = new_position
@@ -333,6 +333,18 @@ class cameraRobot():
 		else:
 			self.arrowsPressed = False
 			self.manual_pitch(axes)
+
+	def update_pos(self, options_button):
+		if not options_button: #circle is not pressed
+			self.options_pressed=False 
+			return
+
+		if self.options_pressed and options_button: #circe was pressed and still is - no changes
+			return None
+		elif not self.options_pressed and options_button:  #circle was not pressed and now is pressed - send information of current pos
+			self.manual_end()
+			self.calculate_pos()
+			self.manual_start_midle()
 
 
 	def manual_pitch(self,axes):
