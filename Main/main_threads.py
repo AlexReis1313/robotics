@@ -24,17 +24,23 @@ def do_obstacle_avoidance(robot,shared_camera_pos, bisturi_pose, calibration_mat
 	return None
 
 def camera_robot_loop(joystick_queue, shared_camera_pos):
-	FPS=40
+	FPS=10
 	clock = pygame.time.Clock()
 	camera_robot = cameraRobot(shared_camera_pos)
+	axes=[0]*4+[-1,-1]
+	buttons=[0]*15
 	try:
 		while True:
 		# Handle events
+			quit=[False]
 			if not joystick_queue.empty(): #if there are events waiting in joystick queue
 				joystick_values = joystick_queue.get()
+				#print('Joystick at camera',joystick_values)
 				axes, buttons, quit = joystick_values[:6], joystick_values[6:-1], joystick_values[-1]
-				
-			if quit:
+			
+			axes, buttons, quit = joystick_queue[:6], joystick_queue[6:-1], joystick_queue[-1]
+
+			if bool(quit):
 				return
 			camera_robot.move(axes, buttons)
 			clock.tick(FPS)
@@ -49,7 +55,7 @@ def camera_robot_loop(joystick_queue, shared_camera_pos):
 
 def bisturi_robot_controll_loop(joystick_queue, shared_camera_pos, info_computer_share):
 	joystick = initialize_joystick()
-	FPS=40
+	FPS=10
 	clock = pygame.time.Clock()
 	bisturi_robot=Robot(joystick,FPS, info_computer_share)
 	
@@ -58,23 +64,23 @@ def bisturi_robot_controll_loop(joystick_queue, shared_camera_pos, info_computer
 	try:
 		while True:
 		# Handle events
-			if pygame.event.peek(): #if there are events waiting in joystick queue
-				axes, buttons, quit = get_joystick(joystick)
-				joystick_queue.put(axes + buttons + quit)
+			#if pygame.event.peek(): #if there are events waiting in joystick queue
+			axes, buttons, quit = get_joystick(joystick)
+			joystick_queue=axes + buttons + [quit]
 
 			if quit or  bisturi_robot.get_stop_program():
-				joystick_queue.put(axes + buttons + [True])
+				joystick_queue=axes + buttons + [True]
 				return
-			if count> 5*FPS: #happens one time each second
+			""" if count> 5*FPS: #happens one time each second
 				count=0
 				bisturi_robot.manual_end()
 				bisturi_robot.calculate_pos()
 				bisturi_robot.update_bisturi_pos_shared()
-				bisturi_robot.manual_start_midle()
+				bisturi_robot.manual_start_midle() """
 
 			count+=1
 			bisturi_robot.manual_move(axes,buttons)
-			do_obstacle_avoidance(bisturi_robot, shared_camera_pos, bisturi_pose = bisturi_robot.get_last_pos() , calibration_matrix = info_computer_share['calibration_matrix']), 
+			#do_obstacle_avoidance(bisturi_robot, shared_camera_pos, bisturi_pose = bisturi_robot.get_last_pos() , calibration_matrix = info_computer_share['calibration_matrix']), 
 			clock.tick(FPS)
 	
 	except KeyboardInterrupt:
@@ -87,7 +93,7 @@ def bisturi_robot_controll_loop(joystick_queue, shared_camera_pos, info_computer
 
 
 def computer_comunication_loop(info_computer_share):
-	FPS=40
+	FPS=10
 	client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 	client.connect(('194.210.177.59', 50000))
 	clock = pygame.time.Clock()

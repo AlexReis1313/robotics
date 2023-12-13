@@ -9,6 +9,7 @@ import math
 def initialize_joystick():
 	# Initialize Pygame
 	pygame.init()
+
 	# Initialize the gamepad
 	pygame.joystick.init()
 	# Check if any joystick/gamepad is connected

@@ -42,7 +42,7 @@ def clean_buffer(ser):
 
 
 class Robot():
-    def __init__(self, comPort='COM4', speed=10):
+    def __init__(self, comPort='COM3', speed=10):
         self.ser = serial.Serial(comPort, baudrate=9600, bytesize=8, timeout=2, parity='N', xonxoff=0) 
         print("COM port in use: {0}".format(self.ser.name))		
         self.speed = speed

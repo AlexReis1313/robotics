@@ -40,7 +40,7 @@ def clean_buffer(ser):
 
 
 class Robot():
-	def __init__(self, joystick,FPS,info_computer_share=None, comPort='COM4', speedHigh=20, speedLow=10):
+	def __init__(self, joystick,FPS,info_computer_share=None, comPort='COM3', speedHigh=16, speedLow=8):
 		#initialization of the robot class
 		#this function opens the serial connection between the robot and the computer, defined the robot's speed % and calibrates the robot
 		
@@ -54,8 +54,8 @@ class Robot():
 		self.circle_Pressed = False 
 
 		#Statements to use in the function update_speed
-		self.speed=self.speedLow = speedLow
-		self.speedHigh=speedHigh
+		self.speedLow = speedLow
+		self.speed=self.speedHigh=speedHigh
 		self.previousHighSpeed=False
 		self.joystick = joystick
 		self.triangle_Pressed=False
@@ -64,7 +64,7 @@ class Robot():
 		self.initial_manual_start()
 
 		self.stop_program=False
-		while True:
+		""" while True:
 			calibration_result = self.calibrate(FPS)
 			if  calibration_result: #calibration finished successfully
 				self.calibratedPos = self.pos
@@ -74,7 +74,7 @@ class Robot():
 				break
 			else: 
 				self.manual_end()
-				print('Try calibration again') 
+				print('Try calibration again')  """
 
 	def get_stop_program(self):
 		return self.stop_program
@@ -115,29 +115,30 @@ class Robot():
 		if not speed: #if speed argument is not given, use normal speed of robot
 			speed=self.speed
 		
-		self.ser.write(b'\r')
-		self.ser.write(b'~ \r')
-		self.ser.write(b's \r')
-		self.ser.write(f'{speed} \r'.encode('utf-8'))
-		self.ser.write(f'{type} \r'.encode('utf-8'))
-		time.sleep(0.1)
+		self.serial_write(b'\r')
+		self.serial_write(b'~ \r')
+		self.serial_write(b's \r')
+		self.serial_write(f'{speed} \r'.encode('utf-8'))
+		time.sleep(0.4)
+		self.serial_write(f'{type} \r'.encode('utf-8'))
+		time.sleep(0.2)
 
 	def manual_start_midle(self, *speed):
 		if not speed: #if speed argument is not given, use normal speed of robot
 			speed=self.speed
 		
-		self.ser.write(b'\r')
-		self.ser.write(b'~ \r')
-		self.ser.write(b's \r')
-		self.ser.write(f'{speed} \r'.encode('utf-8'))
+		self.serial_write(b'\r')
+		self.serial_write(b'~ \r')
+		self.serial_write(b's \r')
+		self.serial_write(f'{speed} \r'.encode('utf-8'))
 		#time.sleep(0.05)
 
 	def manual_end(self):
-		self.ser.write(b'\r')
+		self.serial_write(b'\r')
 		#clean_buffer(serial)
-		self.ser.write(b'~\r')
+		self.serial_write(b'~\r')
 		time.sleep(0.05)
-		self.ser.write(b'\r')
+		self.serial_write(b'\r')
 
 
 	def get_calibrationPos(self):#return calibration position
@@ -203,34 +204,34 @@ class Robot():
 		self.tara(buttons[1]) #tara/zero the position shown on screen
 		_ = self.update_speed(buttons[3]) #change speed if triange is pressed
 		if axes[1] < -0.2:
-			self.ser.write(b'Q \r')
+			self.serial_write(b'Q \r')
 
 		elif axes[1] > 0.2:
-			self.ser.write(b'1 \r')
+			self.serial_write(b'1 \r')
 
 		if axes[0] < -0.2:
-			self.ser.write(b'2 \r')
+			self.serial_write(b'2 \r')
 
 		elif axes[0] > 0.2:
-			self.ser.write(b'W \r')
+			self.serial_write(b'W \r')
 
 		if axes[2] < -0.2:
-			self.ser.write(b'4 \r')
+			self.serial_write(b'4 \r')
 
 		elif axes[2] > 0.2:
-			self.ser.write(b'R \r')
+			self.serial_write(b'R \r')
 
 		if axes[3] < -0.2:
-			self.ser.write(b'T \r')
+			self.serial_write(b'T \r')
 
 		elif axes[3] > 0.2:
-			self.ser.write(b'5 \r')
+			self.serial_write(b'5 \r')
 		
 		if buttons[9] ==1:
-			self.ser.write(b'3 \r')
+			self.serial_write(b'3 \r')
 
 		elif buttons[10] ==1:
-			self.ser.write(b'E \r') 
+			self.serial_write(b'E \r') 
 		
 		#we should update the self.pos info with an estimation, based on the input of manual movement
 		#self.update_bisturi_pos_shared()
@@ -240,12 +241,12 @@ class Robot():
 
 
 	def go_home(self):
-		self.ser.write(b'home\r')
+		self.serial_write(b'home\r')
 		time.sleep(180) # homing takes a few minutes ...
 	
 	def calculate_pos(self):
 	
-		self.ser.write(b'LISTPV POSITION \r')
+		self.serial_write(b'LISTPV POSITION \r')
 		time.sleep(0.05)
 		clean_buffer(self.ser)
 		robot_output = read_and_wait(self.ser,0.15)
@@ -274,11 +275,15 @@ class Robot():
 		time.sleep(0.5)
 		self.ser.close()
 		print('housekeeping completed - exiting')	
+
+	def serial_write(self, toWrite):
+		self.ser.write(toWrite)
+		print('bisturi', toWrite)
 		
 
 class cameraRobot():
 	#this robot's y axis should be parallel to the table/jellow
-	def __init__(self, shared_camera_pos=None, robotSpeed=2, comPort='COM4' ):
+	def __init__(self, shared_camera_pos=None, robotSpeed=2, comPort='COM5' ):
 		
 		self.ser = serial.Serial(comPort, baudrate=9600, bytesize=8, timeout=2, parity='N', xonxoff=0) #change for lab ------------------------HERE FOR LAB
 		print("COM port in use: {0}".format(self.ser.name))		
@@ -287,10 +292,12 @@ class cameraRobot():
 
 		self.calculate_pos()
 		time.sleep(0.5)
+		self.serial_write(b'DEFP A')
+		time.sleep(0.8)
 		self.serial_write(b'HERE A')
 		time.sleep(0.5)
-		speed_string=f'SPEED {robotSpeed}'.encode('utf-8')
-		self.serial_write(speed_string)
+		
+		self.serial_write(f'SPEED {robotSpeed}'.encode('utf-8'))
 		time.sleep(0.5)
 		self.initial_manual_start()
 		print('Ready')
@@ -329,10 +336,10 @@ class cameraRobot():
 
 
 	def manual_pitch(self,axes):
-		if axes[4] > -0.7:
+		if axes[4] > 0:
 			self.serial_write(b'R \r')
 
-		elif axes[5] > -0.7:
+		elif axes[5] > 0:
 			self.serial_write(b'4 \r')
 
 	def set_position(self, position_values):
@@ -405,7 +412,7 @@ class cameraRobot():
 	
 	def serial_write(self, toWrite):
 		self.ser.write(toWrite)
-		print(toWrite)
+		print('camera',toWrite)
 	
 
 	def housekeeping(self):
