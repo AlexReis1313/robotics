@@ -43,7 +43,8 @@ def robot_controll_main_loop():
 	FPS=40
 	clock = pygame.time.Clock()
 	bisturi_robot=Robot(joystick,FPS, sharedData)
-	
+	f=open('Data_robot_movement.txt','w')
+
 	robots=[bisturi_robot]
 	count=0
 	try:
@@ -64,11 +65,14 @@ def robot_controll_main_loop():
 			count+=1
 			bisturi_robot.manual_move(axes,buttons)
 			clock.tick(FPS)
+
 	
 	except KeyboardInterrupt:
 		pass
 	finally:
 		pygame.quit()
+		f.close()
+
 		for robot in robots:
 			robot.housekeeping() #this ends the manual mode and closes the serial port
 
@@ -88,5 +92,5 @@ def main():
 	#computer_comunication_thread.join()
 
 if __name__ == "__main__":
-    robot_controll_main_loop()
+    camera_robot_loop()
 	

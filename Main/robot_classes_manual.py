@@ -263,7 +263,7 @@ class Robot():
 
 class cameraRobot():
 	#this robot's y axis should be parallel to the table/jellow
-	def __init__(self, shared_camera_pos=None, robotSpeed=10, comPort='COM4' ):
+	def __init__(self, shared_camera_pos=None, robotSpeed=8, comPort='COM4' ):
 		
 		self.ser = serial.Serial(comPort, baudrate=9600, bytesize=8, timeout=2, parity='N', xonxoff=0) #change for lab ------------------------HERE FOR LAB
 		print("COM port in use: {0}".format(self.ser.name))		
@@ -288,29 +288,30 @@ class cameraRobot():
 		self.radius = (self.pos[2]/math.sin(self.theta))
 
 	def get_theta(self):
-		return abs(self.pos[3]*0.1)
+
+		return math.radians(abs(self.pos[3]*0.1))
 	
 	def move(self, axes,buttons ):
 		if max(buttons[11:15]):
 			if not self.arrowsPressed: #if some arrow button has just been pressed
 				self.manual_end()
 				if buttons[11]-buttons[12]>0:
-					self.theta += math.pi/12
+					self.theta += math.pi/20
 				elif buttons[11]-buttons[12]<0:
-					self.theta -= math.pi/12
+					self.theta -= math.pi/20
 
 				if buttons[13]-buttons[14]>0:
-					self.radius += self.radius * 0.15
+					self.radius += self.radius * 0.1
 				elif buttons[13]-buttons[14]<0:
-					self.radius -= self.radius * 0.15
+					self.radius -= self.radius * 0.1
 
 				
 				x= self.x_plus_a_Constant - self.radius * math.cos(self.theta)
 				z=self.radius * math.sin(self.theta)
-				new_position = [x, self.pos[1], z,self.pos[5],self.pos[4] ]
+				new_position = [x, self.pos[1], z,self.pos[3],self.pos[4] ]
 
 				self.set_position(new_position)
-				self.serial_write(b'Move AA \r')
+				self.serial_write(b'Move A \r')
 				time.sleep(0.5)
 
 				self.pos = new_position
@@ -337,7 +338,7 @@ class cameraRobot():
 		for i,coordenate in enumerate(position_values) :
 			if self.pos[i] != position_values[i]:
 				#printToRobot=f'SHIFT AA BY {i+1} {int(delta)} \r'
-				printToRobot=f'SETPVC AA {cartesian[i]} {int(coordenate)}\r'
+				printToRobot=f'SETPVC A {cartesian[i]} {int(coordenate)}\r'
 				print(printToRobot)
 				self.serial_write(printToRobot.encode('utf-8'))
 				time.sleep(0.5)
@@ -350,7 +351,7 @@ class cameraRobot():
 		self.serial_write(b'~ \r')
 		self.serial_write(b's \r')
 		self.serial_write(f'{self.speed} \r'.encode('utf-8'))
-		self.serial_write(b'X \r')
+		self.serial_write(b'J \r')
 		time.sleep(0.1)
 
 	def manual_start_midle(self):
@@ -400,8 +401,9 @@ class cameraRobot():
 		return self.joints
 	
 	def serial_write(self, toWrite):
-		#self.ser.write(toWrite)
+		self.ser.write(toWrite)
 		print(toWrite)
+	
 
 	def housekeeping(self):
 		self.manual_end()

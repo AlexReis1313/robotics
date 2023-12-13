@@ -52,24 +52,24 @@ class Robot():
         self.ser.write(b's \r')
         self.ser.write(f'{self.speed} \r'.encode('utf-8'))
         self.ser.write(b'X \r')
-        time.sleep(0.1)
+        time.sleep(0.5)
     
     def manual_start_midle(self):
         self.ser.write(b'\r')
         self.ser.write(b'~ \r')
         self.ser.write(b's \r')
         self.ser.write(f'{self.speed} \r'.encode('utf-8'))
-        #time.sleep(0.05)
+        time.sleep(0.5)
     
     def manual_end(self):
         self.ser.write(b'\r')
         #clean_buffer(serial)
         self.ser.write(b'~\r')
-        time.sleep(0.05)
+        time.sleep(0.2)
         self.ser.write(b'\r')
 	
     def manual_move(self,message ):
-        input_random= np.random.uniform(size = 5, low = -1, high = 1) 
+        input_random= [0,-1,0,0,0]
     
         if input_random[1] < -0.2:
             self.ser.write(b'Q \r')
@@ -110,13 +110,14 @@ class Robot():
             self.ser.write(b'E \r') 
             message['E']+=1
         return message
+    
     def go_home(self):
         self.ser.write(b'home\r')
         time.sleep(180) # homing takes a few minutes ...
     
     def calculate_pos(self):
         self.ser.write(b'LISTPV POSITION \r')
-        time.sleep(0.05)
+        time.sleep(0.4)
         clean_buffer(self.ser)
         robot_output = read_and_wait(self.ser,0.15)
         output_after = robot_output.replace(': ', ':').replace('>','')
@@ -147,18 +148,18 @@ class Robot():
 
 
 def robot_controll_main_loop():
-	FPS=40
-	clock = pygame.time.Clock()
-	bisturi_robot=Robot()
-    robots=[bisturi_robot]
+    FPS=40
+    clock = pygame.time.Clock()
+    bisturi_robot=Robot()
     count=0
+    robots=[bisturi_robot]
     f=open('Data_robot_movement.txt','w')
     try:
-        for k in range(50):
+        for k in range(5):
             delta_pos=[]
             initial_pos = bisturi_robot.get_pos()
             message= {'Q':0, '1':0,  'W':0,'2':0, 'E':0,'3':0,  'R':0,'4':0, 'T':0,'5':0,}
-            for i in range(random.randint(0, FPS/4)):
+            for i in range(FPS/4):
                 message = bisturi_robot.manual_move(message)
                 count+=1
                 clock.tick(FPS)
