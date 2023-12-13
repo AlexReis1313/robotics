@@ -288,7 +288,7 @@ class cameraRobot():
 		self.radius = (self.pos[2]/math.sin(self.theta))
 
 	def get_theta(self):
-		return abs(self.pos[3]*10^(-1))
+		return abs(self.pos[3]*0.1)
 	
 	def move(self, axes,buttons ):
 		if max(buttons[11:15]):
