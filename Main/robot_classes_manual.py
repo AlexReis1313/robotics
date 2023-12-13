@@ -278,13 +278,22 @@ class Robot():
 
 class cameraRobot():
 	#this robot's y axis should be parallel to the table/jellow
-	def __init__(self, shared_camera_pos=None, robotSpeed=8, comPort='COM4' ):
+	def __init__(self, shared_camera_pos=None, robotSpeed=2, comPort='COM4' ):
 		
 		self.ser = serial.Serial(comPort, baudrate=9600, bytesize=8, timeout=2, parity='N', xonxoff=0) #change for lab ------------------------HERE FOR LAB
 		print("COM port in use: {0}".format(self.ser.name))		
 		self.speed=robotSpeed
 		self.shared_camera_pos = shared_camera_pos
+
+		self.calculate_pos()
+		time.sleep(0.5)
+		self.serial_write(b'HERE A')
+		time.sleep(0.5)
+		speed_string=f'SPEED {robotSpeed}'.encode('utf-8')
+		self.serial_write(speed_string)
+		time.sleep(0.5)
 		self.initial_manual_start()
+		print('Ready')
 
 	
 
@@ -292,20 +301,21 @@ class cameraRobot():
 		if max(buttons[11:15]):
 			if not self.arrowsPressed: #if some arrow button has just been pressed
 				self.manual_end()
+				delta_z=delta_x=0
 				if buttons[11]-buttons[12]>0: #move up - arrow up pressed
-					delta_z=100
+					delta_z=500
 				elif buttons[11]-buttons[12]<0: #move down - arrow down pressed
-					delta_z=-100
+					delta_z=-500
 
 				if buttons[13]-buttons[14]>0: #move backward - arrow left pressed
-					delta_x=100
+					delta_x=250
 				elif buttons[13]-buttons[14]<0:#move foward - arrow right pressed
-					delta_x=-100
+					delta_x=-250
 
 				new_position = [self.pos[0]+delta_x, self.pos[1], self.pos[2]+delta_z, self.pos[3],self.pos[4] ]
 
 				self.set_position(new_position)
-				self.serial_write(b'Move A \r')
+				self.serial_write(b'Move A 200\r')
 				time.sleep(0.5)
 
 				self.pos = new_position
@@ -343,6 +353,7 @@ class cameraRobot():
 		self.serial_write(b'~ \r')
 		self.serial_write(b's \r')
 		self.serial_write(f'{self.speed} \r'.encode('utf-8'))
+		time.sleep(0.3)
 		self.serial_write(b'J \r')
 		time.sleep(0.1)
 
@@ -367,7 +378,7 @@ class cameraRobot():
 		time.sleep(180) # homing takes a few minutes ...
 	
 	def calculate_pos(self):
-	
+		time.sleep(0.3)
 		self.serial_write(b'LISTPV POSITION \r')
 		time.sleep(0.05)
 		clean_buffer(self.ser)

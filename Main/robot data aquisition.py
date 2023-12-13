@@ -42,7 +42,7 @@ def clean_buffer(ser):
 
 
 class Robot():
-    def __init__(self, comPort='COM4', speed=20):
+    def __init__(self, comPort='COM4', speed=10):
         self.ser = serial.Serial(comPort, baudrate=9600, bytesize=8, timeout=2, parity='N', xonxoff=0) 
         print("COM port in use: {0}".format(self.ser.name))		
         self.speed = speed
@@ -53,8 +53,9 @@ class Robot():
         self.ser.write(b'~ \r')
         self.ser.write(b's \r')
         self.ser.write(f'{self.speed} \r'.encode('utf-8'))
-        self.ser.write(b'X \r')
-        time.sleep(0.5)
+        time.sleep(0.4)
+        self.ser.write(b'J \r')
+        time.sleep(0.3)
     
     def manual_start_midle(self):
         self.ser.write(b'\r')
@@ -118,8 +119,9 @@ class Robot():
         time.sleep(180) # homing takes a few minutes ...
     
     def calculate_pos(self):
-        self.ser.write(b'LISTPV POSITION \r')
         time.sleep(0.4)
+        self.ser.write(b'LISTPV POSITION \r')
+        time.sleep(0.05)
         clean_buffer(self.ser)
         robot_output = read_and_wait(self.ser,0.15)
         output_after = robot_output.replace(': ', ':').replace('>','')
@@ -136,13 +138,13 @@ class Robot():
 		#run calculate_pos before running get_pos to update the values
         print('Getting pos...')
         self.manual_end()
-        time.sleep(0.3)
+        time.sleep(1)
         self.calculate_pos()
         time.sleep(0.3)
-        self.manual_start_midle
+        self.manual_start_midle()
         print('concluded')
 
-        return self.pos
+        return self.joints
     def get_last_joints(self):
 		#function to get joint values
 		#run calculate_pos before running get_joints to update the joint values
@@ -161,7 +163,7 @@ def robot_controll_main_loop():
     clock = pygame.time.Clock()
     bisturi_robot=Robot()
     
-    f=open('Data_robot_movement.txt','w')
+    f=open('Data_joints.txt','w')
     message= {'Q':0, '1':0,  'W':0,'2':0, 'E':0,'3':0,  'R':0,'4':0, 'T':0,'5':0,}
     delta_pos=[]
     initial_pos = bisturi_robot.get_pos()
@@ -173,22 +175,27 @@ def robot_controll_main_loop():
             # Handle events
             if pygame.event.peek():  # if there are events waiting in the joystick queue
                 axes, buttons, quit = get_joystick(joystick)
+                if count==-1:
+                    count=0
 
             
-            if count > FPS:  # happens one time each second
-                count = 0
+            """  if count > FPS:  # happens one time each second
+                print('saving')
+                count = -1
                 final_pos = bisturi_robot.get_pos()
+                print(final_pos)
                 for i in range(len(initial_pos)):
                     delta_pos.append(final_pos[i] - initial_pos[i])
-                if max(delta_pos) > 1 or min(delta_pos) < -1:
-                    f.write(f'{delta_pos}   {message}\n')
+                f.write(f'{delta_pos}   {message}\n')
                 message = {'Q': 0, '1': 0, 'W': 0, '2': 0, 'E': 0, '3': 0, 'R': 0, '4': 0, 'T': 0, '5': 0}
                 delta_pos = []
-                initial_pos = final_pos
+                initial_pos = final_p """
 
-
-            count += 1
-            message = bisturi_robot.manual_move(axes, buttons, message)
+            tocheck=[abs(axes[i]) for i in range(len(axes)-2)]
+            if max(buttons)>0 or max(tocheck)>0.2 and count!=-1:
+                count += 1
+                message = bisturi_robot.manual_move(axes, buttons, message)
+                print('+count')
             clock.tick(FPS)
 
     except KeyboardInterrupt:
