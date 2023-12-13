@@ -15,6 +15,7 @@ def read_and_wait(ser, wait_time):
 				# Print the contents of the serial data
 				try:
 					output = output + serString.decode("Ascii")
+					print(output)
 					print(serString.decode("Ascii"))
 				except:
 					pass
