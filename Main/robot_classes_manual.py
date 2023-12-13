@@ -283,15 +283,12 @@ class cameraRobot():
 		self.calibrated_joints = self.joints
 		
  
-		self.theta = self.foward_kinematics() #left to do
+		self.theta = self.get_theta() #left to do
 		self.x_plus_a_Constant = self.pos[0] + (self.pos[2]/math.tan(self.theta))
 		self.radius = (self.pos[2]/math.sin(self.theta))
 
-	def foward_kinematics(self):
-		#use:
-		self.joints
-		#calculate theta
-		return theta
+	def get_theta(self):
+		return abs(self.pos[3]*10^(-1))
 	
 	def move(self, axes,buttons ):
 		if max(buttons[11:15]):
