@@ -65,6 +65,7 @@ class Robot():
 			
 			
 			print('Sensitivity changed')
+
 			if self.sensitivity >self.otherSensitivity:
 				print('high')
 				sensitivity = 'High'
@@ -140,7 +141,7 @@ class Robot():
 		deltasum=0
 		for delta in PosDeltas:
 			deltasum+=pow(delta,2) #sum of squared values
-
+		
 		Threshold = 1
 		if deltasum>Threshold:
 			shared_queue.put(putInQueue)	
