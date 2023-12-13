@@ -16,8 +16,7 @@ from robot_classes_manual import *
 
 
 
-def do_obstacle_avoidance(robot,shared_camera_pos, sharedData):
-	robot.calculate_pos()
+def do_obstacle_avoidance(robot,shared_camera_pos, bisturi_pose, calibration_matrix):
 	#sharedData[1] = robot.get_last_pos()
 
 	#this function should then do obstacle avoindace. This has not yet been done
@@ -69,12 +68,13 @@ def bisturi_robot_controll_loop(joystick_queue, shared_camera_pos, info_computer
 			if count> 5*FPS: #happens one time each second
 				count=0
 				bisturi_robot.manual_end()
-				do_obstacle_avoidance(bisturi_robot,shared_camera_pos, sharedData, info_computer_share)
+				bisturi_robot.calculate_pos()
+				bisturi_robot.update_bisturi_pos_shared()
 				bisturi_robot.manual_start_midle()
 
-			#share_data_computers(buttons,bisturi_robot ,sharedData)
 			count+=1
 			bisturi_robot.manual_move(axes,buttons)
+			do_obstacle_avoidance(bisturi_robot, shared_camera_pos, bisturi_pose = bisturi_robot.get_last_pos() , calibration_matrix = info_computer_share['calibration_matrix']), 
 			clock.tick(FPS)
 	
 	except KeyboardInterrupt:
@@ -87,6 +87,7 @@ def bisturi_robot_controll_loop(joystick_queue, shared_camera_pos, info_computer
 
 
 def computer_comunication_loop(info_computer_share):
+	FPS=40
 	client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 	client.connect(('194.210.177.59', 50000))
 	clock = pygame.time.Clock()
@@ -117,9 +118,7 @@ def computer_comunication_loop(info_computer_share):
 					last_cutting_plan = info_computer_share['cutting_plan']
 					message +=f'Cutting Plan: {last_cutting_plan}\n'
 				
-				if info_computer_share['tara coordinates']:
-					info_computer_share['tara coordinates']=0
-					message +=f'Tara coordinates\n'
+				
 
 				len_mssg=len(message)
 				if len_mssg:
@@ -144,7 +143,7 @@ def computer_comunication_loop(info_computer_share):
 def main():
 	joystick_queue = queue.Queue() #this queue will save values for the joystick's current state - it will be shared between the loops for both robots
 	shared_camera_pos =[0,0,0,0,0]
-	info_computer_share = {'state': -1, 'last_bisturi_pos': [0,0,0,0,0], 'calibration_matrix': None, 'cutting_plan':[0,0,0], 'tara coordinates':0}
+	info_computer_share = {'state': -1, 'last_bisturi_pos': [0,0,0,0,0], 'calibration_matrix': None, 'cutting_plan':[0,0,0], }
 							#state: -1 if in no state
 							#		0 if in calibration
 							#		1 if in running

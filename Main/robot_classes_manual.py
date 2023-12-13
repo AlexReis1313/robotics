@@ -40,7 +40,7 @@ def clean_buffer(ser):
 
 
 class Robot():
-	def __init__(self, joystick,FPS,info_computer_share, comPort='COM4', speedHigh=20, speedLow=10):
+	def __init__(self, joystick,FPS,info_computer_share=None, comPort='COM4', speedHigh=20, speedLow=10):
 		#initialization of the robot class
 		#this function opens the serial connection between the robot and the computer, defined the robot's speed % and calibrates the robot
 		
@@ -59,6 +59,8 @@ class Robot():
 		self.previousHighSpeed=False
 		self.joystick = joystick
 		self.triangle_Pressed=False
+		self.tara_position =[0,0,0,0,0] #this is used to keep track of tara/zero 
+
 		self.initial_manual_start()
 
 		self.stop_program=False
@@ -153,7 +155,8 @@ class Robot():
 			if not self.previousHighSpeed: #robot was previously with low speed - and will now have high speed
 				self.manual_end()
 				time.sleep(0.1)
-				self.initial_manual_start(type = 'J', speed=self.speedHigh)
+				self.speed=self.speedHigh
+				self.initial_manual_start(type = 'J')
 
 				self.previousHighSpeed = True
 				self.joystick.rumble(0, 0.8, 100)
@@ -164,7 +167,8 @@ class Robot():
 			else: #robot was previously with high speed and will now have low speed
 				self.manual_end()
 				time.sleep(0.1)
-				self.initial_manual_start(type = 'X', speed=self.speedLow)
+				self.speed=self.speedLow
+				self.initial_manual_start(type = 'X')
 
 				self.previousHighSpeed = False
 				self.joystick.rumble(0.8, 0, 100)
@@ -177,7 +181,7 @@ class Robot():
 			self.triangle_Pressed=False #button is not pressed - prepare to change sensitivity when button is pressed again
 			return False
 
-	def share_information(self, circleButton):
+	def tara(self, circleButton):
 		if not circleButton: #circle is not pressed
 			self.circle_Pressed=False 
 			return
@@ -188,14 +192,16 @@ class Robot():
 			self.manual_end()
 			self.calculate_pos()
 			self.manual_start_midle()
-			self.sharedData[1]=self.pos
+			self.tara_position=self.pos
+			self.update_bisturi_pos_shared()
+
 
 		
-		 
+		
+
 	def manual_move(self, axes,buttons ):
-		
-		move_bool = self.update_speed(buttons[3]) #change speed if triange is pressed
-		
+		self.tara(buttons[1]) #tara/zero the position shown on screen
+		_ = self.update_speed(buttons[3]) #change speed if triange is pressed
 		if axes[1] < -0.2:
 			self.ser.write(b'Q \r')
 
@@ -225,6 +231,13 @@ class Robot():
 
 		elif buttons[10] ==1:
 			self.ser.write(b'E \r') 
+		
+		#we should update the self.pos info with an estimation, based on the input of manual movement
+		#self.update_bisturi_pos_shared()
+
+	def update_bisturi_pos_shared(self):
+		self.info_computer_share['last_bisturi_pos']=[self.pos[i]-self.tara_position[i] for i in range(len(self.pos))]
+
 
 	def go_home(self):
 		self.ser.write(b'home\r')
@@ -296,7 +309,7 @@ class cameraRobot():
 				time.sleep(0.5)
 
 				self.pos = new_position
-				#self.shared_camera_pos = new_position    --- change for threads
+				self.shared_camera_pos = new_position   #--- change for threads
 				self.arrowsPressed = True
 				self.manual_start_midle()
 
