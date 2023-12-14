@@ -156,7 +156,7 @@ class Robot():
 				self.initial_manual_start(type = 'J')
 
 				self.previousHighSpeed = True
-				self.joystick.rumble(0, 0.8, 100)
+				self.joystick.rumble(0.1, 1, 100)
 				self.info_computer_share['Speed']='Speed High'
 				print('High speed')
 
@@ -168,7 +168,7 @@ class Robot():
 				self.initial_manual_start(type = 'X')
 
 				self.previousHighSpeed = False
-				self.joystick.rumble(0.8, 0, 100)
+				self.joystick.rumble(1, 0.2, 100)
 				self.info_computer_share['Speed']='Speed Low'
 				print('Low speed')
 
