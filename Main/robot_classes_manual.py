@@ -40,13 +40,14 @@ def clean_buffer(ser):
 
 
 class Robot():
-	def __init__(self, joystick,FPS,info_computer_share=None, comPort='COM3', speedHigh=16, speedLow=8):
+	def __init__(self, joystick,FPS,info_computer_share=None,atHome=False, comPort='COM3', speedHigh=16, speedLow=8):
 		#initialization of the robot class
 		#this function opens the serial connection between the robot and the computer, defined the robot's speed % and calibrates the robot
-		
-		self.ser = serial.Serial(comPort, baudrate=9600, bytesize=8, timeout=2, parity='N', xonxoff=0) #change for lab ------------------------HERE FOR LAB
-		print("COM port in use: {0}".format(self.ser.name))		
-
+		if not atHome:
+			self.ser = serial.Serial(comPort, baudrate=9600, bytesize=8, timeout=2, parity='N', xonxoff=0) #change for lab ------------------------HERE FOR LAB
+			print("COM port in use: {0}".format(self.ser.name))		
+		else:
+			self.ser=False
 		#for the function that shares information with other computer
 		self.info_computer_share= info_computer_share 
 			#List where self.sharedData[0] is the robot's calibration pos, self.sharedData[1] is the current position of the robot,
@@ -140,11 +141,6 @@ class Robot():
 		time.sleep(0.05)
 		self.serial_write(b'\r')
 
-
-	def get_calibrationPos(self):#return calibration position
-		#this function can be used when evaluating if the robot is going to colide with something. by returning the initial calibration position
-		#for example, to check if a new position of the robot will make it colide with the table, we can check if the z axis of that position if some cm lower than the calibration positon z axis
-		return self.calibratedPos
 	
 	def get_speed(self):
 		return self.speed
@@ -248,6 +244,8 @@ class Robot():
 	
 		self.serial_write(b'LISTPV POSITION \r')
 		time.sleep(0.05)
+		#uncoment when in lab
+		""" 
 		clean_buffer(self.ser)
 		robot_output = read_and_wait(self.ser,0.15)
 		output_after = robot_output.replace(': ', ':').replace('>','')
@@ -257,7 +255,8 @@ class Robot():
 			[key, value] = pair.split(':')
 			result_list.append(int(value))
 		self.joints = result_list[0:5]
-		self.pos = result_list[5:10] 
+		self.pos = result_list[5:10]  """
+		self.pos = [0,0,0,0,0]
 
 
 	def get_last_pos(self):
@@ -273,20 +272,23 @@ class Robot():
 	def housekeeping(self):
 		self.manual_end()
 		time.sleep(0.5)
-		self.ser.close()
+		#self.ser.close() ----- 				------change for lab
 		print('housekeeping completed - exiting')	
 
 	def serial_write(self, toWrite):
-		self.ser.write(toWrite)
+		if self.ser!=False: #if not atHome
+			self.ser.write(toWrite)
 		print('bisturi', toWrite)
 		
 
 class cameraRobot():
 	#this robot's y axis should be parallel to the table/jellow
-	def __init__(self, shared_camera_pos=None, robotSpeed=2, comPort='COM5' ):
-		
-		self.ser = serial.Serial(comPort, baudrate=9600, bytesize=8, timeout=2, parity='N', xonxoff=0) #change for lab ------------------------HERE FOR LAB
-		print("COM port in use: {0}".format(self.ser.name))		
+	def __init__(self, shared_camera_pos=None,atHome=False, robotSpeed=2, comPort='COM5' ):
+		if not atHome:
+			self.ser = serial.Serial(comPort, baudrate=9600, bytesize=8, timeout=2, parity='N', xonxoff=0) #change for lab ------------------------HERE FOR LAB
+			print("COM port in use: {0}".format(self.ser.name))	
+		else:
+			self.ser=False	
 		self.speed=robotSpeed
 		self.shared_camera_pos = shared_camera_pos
 
@@ -309,6 +311,8 @@ class cameraRobot():
 		if max(buttons[11:15]):
 			if not self.arrowsPressed: #if some arrow button has just been pressed
 				self.manual_end()
+				delta_z =0
+				delta_x=0
 				if buttons[11]-buttons[12]>0: #move up - arrow up pressed
 					delta_z=100
 				elif buttons[11]-buttons[12]<0: #move down - arrow down pressed
@@ -400,7 +404,8 @@ class cameraRobot():
 		time.sleep(0.3)
 		self.serial_write(b'LISTPV POSITION \r')
 		time.sleep(0.05)
-		clean_buffer(self.ser)
+		#						-------change for lanb
+		""" clean_buffer(self.ser)
 		robot_output = read_and_wait(self.ser,0.15)
 		output_after = robot_output.replace(': ', ':').replace('>','')
 		pairs=output_after.split() #separate in pairs of the form 'n:m'
@@ -409,8 +414,8 @@ class cameraRobot():
 			[key, value] = pair.split(':')
 			result_list.append(int(value))
 		self.joints = result_list[0:5]
-		self.pos = result_list[5:10] 
-
+		self.pos = result_list[5:10]  """
+		self.pos =[0,0,0,0,0]
 
 	def get_pos(self):
 		#function to get axis position values
@@ -423,13 +428,14 @@ class cameraRobot():
 		return self.joints
 	
 	def serial_write(self, toWrite):
-		self.ser.write(toWrite)
+		if self.ser!=False: #if not atHome
+			self.ser.write(toWrite)
 		print('camera',toWrite)
 	
 
 	def housekeeping(self):
 		self.manual_end()
 		time.sleep(0.5)
-		self.ser.close()
+		#self.ser.close()    --------------change for lab
 		print('housekeeping completed - exiting')	
 		

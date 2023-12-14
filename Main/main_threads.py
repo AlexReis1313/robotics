@@ -24,23 +24,23 @@ def do_obstacle_avoidance(robot,shared_camera_pos, bisturi_pose, calibration_mat
 	return None
 
 def camera_robot_loop(joystick_queue, shared_camera_pos):
-	FPS=10
+	FPS=40
 	clock = pygame.time.Clock()
-	camera_robot = cameraRobot(shared_camera_pos)
+	camera_robot = cameraRobot(shared_camera_pos, atHome=True)
 	axes=[0]*4+[-1,-1]
 	buttons=[0]*15
 	try:
 		while True:
 		# Handle events
-			quit=[False]
+			quit=False
 			if not joystick_queue.empty(): #if there are events waiting in joystick queue
 				joystick_values = joystick_queue.get()
 				#print('Joystick at camera',joystick_values)
 				axes, buttons, quit = joystick_values[:6], joystick_values[6:-1], joystick_values[-1]
-			
-			axes, buttons, quit = joystick_queue[:6], joystick_queue[6:-1], joystick_queue[-1]
+				while not joystick_queue.empty():
+					joystick_queue.get()
 
-			if bool(quit):
+			if quit:
 				return
 			camera_robot.move(axes, buttons)
 			clock.tick(FPS)
@@ -48,28 +48,29 @@ def camera_robot_loop(joystick_queue, shared_camera_pos):
 	except KeyboardInterrupt:
 		pass
 	finally:
-		pygame.quit()
 		camera_robot.housekeeping() #this ends the manual mode and closes the serial port
 
 
 
 def bisturi_robot_controll_loop(joystick_queue, shared_camera_pos, info_computer_share):
 	joystick = initialize_joystick()
-	FPS=10
+	FPS=40
 	clock = pygame.time.Clock()
-	bisturi_robot=Robot(joystick,FPS, info_computer_share)
+	bisturi_robot=Robot(joystick,FPS, info_computer_share, atHome=True)
 	
 	robots=[bisturi_robot]
 	count=0
+	
 	try:
 		while True:
 		# Handle events
-			#if pygame.event.peek(): #if there are events waiting in joystick queue
-			axes, buttons, quit = get_joystick(joystick)
-			joystick_queue=axes + buttons + [quit]
+			quit=False
+			if pygame.event.peek(): #if there are events waiting in joystick queue
+				axes, buttons, quit = get_joystick(joystick)
+				joystick_queue.put(axes + buttons + [quit])
 
 			if quit or  bisturi_robot.get_stop_program():
-				joystick_queue=axes + buttons + [True]
+				joystick_queue.put(axes + buttons + [True])
 				return
 			""" if count> 5*FPS: #happens one time each second
 				count=0
@@ -84,6 +85,7 @@ def bisturi_robot_controll_loop(joystick_queue, shared_camera_pos, info_computer
 			clock.tick(FPS)
 	
 	except KeyboardInterrupt:
+		joystick_queue.put(axes + buttons + [True])
 		pass
 	finally:
 		pygame.quit()
@@ -147,7 +149,8 @@ def computer_comunication_loop(info_computer_share):
 
 
 def main():
-	joystick_queue = queue.Queue() #this queue will save values for the joystick's current state - it will be shared between the loops for both robots
+
+	joystick_queue = queue.LifoQueue() #this queue will save values for the joystick's current state - it will be shared between the loops for both robots
 	shared_camera_pos =[0,0,0,0,0]
 	info_computer_share = {'state': -1, 'last_bisturi_pos': [0,0,0,0,0], 'calibration_matrix': None, 'cutting_plan':[0,0,0], }
 							#state: -1 if in no state

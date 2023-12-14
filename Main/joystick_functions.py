@@ -20,6 +20,7 @@ def initialize_joystick():
 	joystick = pygame.joystick.Joystick(0)
 	joystick.init()
 	print(f"Gamepad Name: {joystick.get_name()}")
+	print('Press Playstation button to quit')
 	return joystick
 	
 
@@ -31,6 +32,7 @@ def get_joystick(joystick):
 	for event in pygame.event.get():
 		aux+=1
 		if event.type == pygame.QUIT:
+			print('pygame_quit')
 			quit=True
 				
 		# Get gamepad input
@@ -46,4 +48,6 @@ def get_joystick(joystick):
 			axes[i]=round(axe_true,3)
 		else:
 			axes[i]=0
+	if buttons[5]:
+		quit=True
 	return axes, buttons, quit
