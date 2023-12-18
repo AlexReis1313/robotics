@@ -1,31 +1,30 @@
 import socket
+import ast
 
 def define_constants():
     HEADER = 64 #Header before message that tells length of the message that comes next. Wont be needed for project
     PORT = 5050 
-    SERVER = socket.gethostbyname(socket.gethostname()) #gets ip automatically, instead of previous line
+    #SERVER = socket.gethostbyname(socket.gethostname()) #gets ip automatically, instead of previous line
+    SERVER = '194.210.158.147'
     ADDR = (SERVER, PORT)
     FORMAT = 'utf-8'
     DISCONNECT_MESSAGE = '!DISCONNECT'
 
     return HEADER, FORMAT, DISCONNECT_MESSAGE, ADDR
 
-def start_server(ADDR, HEADER, FORMAT, DISCONNECT_MESSAGE, current_state):
+def start_server(ADDR, HEADER, FORMAT, DISCONNECT_MESSAGE):
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM) #tells server what type of ip address to expect and stream type of communication
     server.bind(ADDR)
     server.listen() #waiting for connection
     print(f'[LISTENING] Server is listening on {ADDR[0]}')
-    while True:
-        conn, addr = server.accept() #Waits for new connection to server
-        handle_client(conn,addr, HEADER, FORMAT, DISCONNECT_MESSAGE, current_state)
 
-        if KeyboardInterrupt:
-            break
-    
-def handle_client(conn, addr, HEADER, FORMAT, DISCONNECT_MESSAGE, current_state): #Runs for each client
+    conn, addr = server.accept() #Waits for connection to server
+    handle_client(conn,addr, HEADER, FORMAT, DISCONNECT_MESSAGE)
+
+def handle_client(conn, addr, HEADER, FORMAT, DISCONNECT_MESSAGE): #Runs for each client
     print(f'[NEW CONNECTION] {addr} connected.')
     connected = True
-    
+    cont = 0
     while connected:
 
         #Receive information
@@ -34,27 +33,30 @@ def handle_client(conn, addr, HEADER, FORMAT, DISCONNECT_MESSAGE, current_state)
             data_r_length = int(data_r_length)
             data_r = conn.recv(data_r_length).decode(FORMAT)
             if data_r == DISCONNECT_MESSAGE:
-                connected = False   
-            print(f'[{addr}] {data_r}')
+                print('[DISCONNECTING] GOODBYE!')
+                connected = False
+            else:   
+                print(f'[NEW MESSAGE] {ast.literal_eval(data_r)}')
 
-        #Send information
-            current_state = str(current_state)
-            data_s = current_state.encode(FORMAT)
+        if cont <1: #Only send it on first iteration
+        #Send information - calibration matrix
+            cal_matrix = str(get_calibration_matrix())
+            data_s = cal_matrix.encode(FORMAT)
             data_s_length = len(data_s)
             send_length = str(data_s_length).encode(FORMAT)
             send_length += b' '*(HEADER - len(send_length)) #add padding to equal to header length
             conn.send(send_length)
             conn.send(data_s)
+            cont += 1
     
     conn.close()
 
-def get_current_state():
-    return (-1, [0,0,0,0,0], None, [0,0,0])
+def get_calibration_matrix(): #Needs implemementing
+    return [[1,2,3],[4,5,6],[7,8,9]]
 
 def main():
     HEADER, FORMAT, DISCONNECT_MESSAGE, ADDR = define_constants()
-    current_state = get_current_state()
-    start_server(ADDR, HEADER, FORMAT, DISCONNECT_MESSAGE, current_state)
+    start_server(ADDR, HEADER, FORMAT, DISCONNECT_MESSAGE)
 
 if __name__ == '__main__':
     main()
