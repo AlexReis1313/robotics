@@ -57,14 +57,25 @@ class Robot():
 		#Statements to use in the function update_speed
 		self.speedLow = speedLow
 		self.speed=self.speedHigh=speedHigh
-		self.previousHighSpeed=False
+		self.previousHighSpeed=True
 		self.joystick = joystick
-		self.triangle_Pressed=False
+		self.x_Pressed=False
 		self.tara_position =[0,0,0,0,0] #this is used to keep track of tara/zero 
 
-		self.initial_manual_start()
-
+		self.plan_to_cut_status =False
+		self.triangle_Pressed = False 
+		self.delta_cut=[0,0,0]
 		self.stop_program=False
+		
+		self.info_computer_share['state'] = 0 #in calibration
+		self.manual_mode ='J'
+
+		self.calculate_pos()
+		self.update_bisturi_pos_shared()
+
+		time.sleep(0.7)
+		self.initial_manual_start(type=self.manual_mode)
+
 		""" while True:
 			calibration_result = self.calibrate(FPS)
 			if  calibration_result: #calibration finished successfully
@@ -76,6 +87,7 @@ class Robot():
 			else: 
 				self.manual_end()
 				print('Try calibration again')  """
+		self.info_computer_share['state'] = 1 #robot is running
 
 	def get_stop_program(self):
 		return self.stop_program
@@ -146,14 +158,15 @@ class Robot():
 		return self.speed
 	
 	def update_speed(self, button_Is_Pressed):
-		if self.triangle_Pressed and button_Is_Pressed: #triangle was pressed and still is - no changes to sensitivity
+		if self.x_Pressed and button_Is_Pressed: #x was pressed and still is - no changes to sensitivity
 			return False
-		elif not self.triangle_Pressed and button_Is_Pressed: #triangle was not pressed and now is pressed - change sensitivity from Low to high or High to low
+		elif not self.x_Pressed and button_Is_Pressed: #x was not pressed and now is pressed - change sensitivity from Low to high or High to low
 			if not self.previousHighSpeed: #robot was previously with low speed - and will now have high speed
 				self.manual_end()
 				time.sleep(0.1)
 				self.speed=self.speedHigh
-				self.initial_manual_start(type = 'J')
+				self.manual_mode = 'J'
+				self.initial_manual_start(type = self.manual_mode)
 
 				self.previousHighSpeed = True
 				self.joystick.rumble(0.1, 1, 100)
@@ -165,17 +178,18 @@ class Robot():
 				self.manual_end()
 				time.sleep(0.1)
 				self.speed=self.speedLow
-				self.initial_manual_start(type = 'X')
+				self.manual_mode = 'X'
+				self.initial_manual_start(type = self.manual_mode)
 
 				self.previousHighSpeed = False
 				self.joystick.rumble(1, 0.2, 100)
 				self.info_computer_share['Speed']='Speed Low'
 				print('Low speed')
 
-			self.triangle_Pressed=True
+			self.x_Pressed=True
 			return True
 		else: 
-			self.triangle_Pressed=False #button is not pressed - prepare to change sensitivity when button is pressed again
+			self.x_Pressed=False #button is not pressed - prepare to change sensitivity when button is pressed again
 			return False
 
 	def tara(self, circleButton):
@@ -188,49 +202,152 @@ class Robot():
 		elif not self.circle_Pressed and circleButton:  #circle was not pressed and now is pressed - send information of current pos
 			self.manual_end()
 			self.calculate_pos()
+			self.joystick.rumble(0.4, 0.4, 200)
 			self.manual_start_midle()
 			self.tara_position=self.pos
 			self.update_bisturi_pos_shared()
+			self.circle_Pressed=True 
 
 
+
+	def evaluate_triangle(self, triangleButtons):
+		if not triangleButtons: #triangle is not pressed
+			self.triangle_Pressed=False
+			return
+
+		if self.triangle_Pressed and triangleButtons: #triangle was pressed and still is - no changes
+			return None
+		elif not self.triangle_Pressed and triangleButtons:  #triangle was not pressed and now is pressed - change plan_to_cut status
+			self.triangle_Pressed=True
+			if self.plan_to_cut_status:
+				self.plan_to_cut_status =False
+				self.delta_cut =[0,0,0]
+				self.joystick.rumble(0.8, 0.8, 100)
+				self.info_computer_share['state'] = 1 #robot is running normally
+
+
+			else:
+				self.plan_to_cut_status =True
+				self.joystick.rumble(0.8, 0.8, 400)
+				self.info_computer_share['state'] = 2 #robot is preaparing for cut
+
+
+
+	def perform_cut(self):
+		print('Cutting')
+
+	def plan_to_cut(self, axes, buttons):
+		if buttons[15]: #touchpad clicked
+			self.joystick.rumble(0.6, 0.9, 800)
+			self.info_computer_share['state'] = 3 #robot is cutting
+			self.perform_cut()
+			self.plan_to_cut_status =False
+			self.info_computer_share['state'] = 1 #robot is running normally
+			return
 		
+		sensitivity=2
+		show=False
+
+		if abs(axes[2])>0.4:#length of cut
+			self.delta_cut[0]+=axes[2]*sensitivity
+			show=True
+		if abs(axes[3])>0.4: #depth
+			self.delta_cut[1]+=axes[3]*sensitivity
+			show=True
+
+		if abs(axes[0])>0.3: #direction in degrees
+			self.delta_cut[2]+= axes[0]*sensitivity
+			show=True			
+
+
+		if show:
+			print('Delta to cut ',self.delta_cut)
+			self.info_computer_share['cutting_plan'] = self.delta_cut
+
+	def iterate(self,axes,buttons ):
+		self.evaluate_triangle(buttons[3]) #enter or exit plan to cut mode if triangle is pressed
+		if self.plan_to_cut_status:
+			self.plan_to_cut(axes, buttons)
+		else:
+			self.tara(buttons[1]) #tara/zero the position shown on screen
+			_ = self.update_speed(buttons[0]) #change speed if x is pressed
+			self.manual_move(axes, buttons)
 		
+
 
 	def manual_move(self, axes,buttons ):
-		self.tara(buttons[1]) #tara/zero the position shown on screen
-		_ = self.update_speed(buttons[3]) #change speed if triange is pressed
+		message= {'Q':0, '1':0,  'W':0,'2':0, 'E':0,'3':0,  'R':0,'4':0, 'T':0,'5':0,}
+
 		if axes[1] < -0.2:
 			self.serial_write(b'Q \r')
+			message['Q']+=1
 
 		elif axes[1] > 0.2:
 			self.serial_write(b'1 \r')
+			message['1']+=1
 
 		if axes[0] < -0.2:
 			self.serial_write(b'2 \r')
+			message['2']+=1
 
 		elif axes[0] > 0.2:
 			self.serial_write(b'W \r')
+			message['W']+=1
 
 		if axes[2] < -0.2:
 			self.serial_write(b'4 \r')
+			message['4']+=1
 
 		elif axes[2] > 0.2:
 			self.serial_write(b'R \r')
+			message['R']+=1
 
 		if axes[3] < -0.2:
 			self.serial_write(b'T \r')
+			message['T']+=1
 
 		elif axes[3] > 0.2:
 			self.serial_write(b'5 \r')
+			message['5']+=1
 		
 		if buttons[9] ==1:
 			self.serial_write(b'3 \r')
-
+			message['3']+=1
+		
 		elif buttons[10] ==1:
 			self.serial_write(b'E \r') 
+			message['E']+=1
 		
+
 		#we should update the self.pos info with an estimation, based on the input of manual movement
+			
+		#self.predict_next_pos(message)
 		#self.update_bisturi_pos_shared()
+
+	def predict_next_pos(self, message):
+		deltas=[]
+		deltas.append(message['Q']-message['1'])
+		deltas.append(message['W']-message['2'])
+		deltas.append(message['E']-message['3'])
+		deltas.append(message['R']-message['4'])
+		deltas.append(message['T']-message['5'])
+
+		if self.manual_mode =='X':
+			X_sensitivity =10 #left to adjust
+			for i in self.pos:
+				self.pos[i]+=deltas[i]*X_sensitivity
+
+		elif self.manual_mode =='J':
+			J_sensitivity = 10 #left to adjust
+			for i in self.joints:
+				self.joints[i]+=deltas[i]*J_sensitivity
+			self.pos =self.foward_kinematics()
+
+
+	def foward_kinematics(self): #left to implement
+		pos = self.joints
+		return pos
+	
 
 	def update_bisturi_pos_shared(self):
 		self.info_computer_share['last_bisturi_pos']=[self.pos[i]-self.tara_position[i] for i in range(len(self.pos))]
@@ -244,19 +361,19 @@ class Robot():
 	
 		self.serial_write(b'LISTPV POSITION \r')
 		time.sleep(0.05)
-		#uncoment when in lab
-		""" 
-		clean_buffer(self.ser)
-		robot_output = read_and_wait(self.ser,0.15)
-		output_after = robot_output.replace(': ', ':').replace('>','')
-		pairs=output_after.split() #separate in pairs of the form 'n:m'
-		result_list=[]
-		for pair in pairs:
-			[key, value] = pair.split(':')
-			result_list.append(int(value))
-		self.joints = result_list[0:5]
-		self.pos = result_list[5:10]  """
-		self.pos = [0,0,0,0,0]
+		if self.ser!=False:
+			clean_buffer(self.ser)
+			robot_output = read_and_wait(self.ser,0.15)
+			output_after = robot_output.replace(': ', ':').replace('>','')
+			pairs=output_after.split() #separate in pairs of the form 'n:m'
+			result_list=[]
+			for pair in pairs:
+				[key, value] = pair.split(':')
+				result_list.append(int(value))
+			self.joints = result_list[0:5]
+			self.pos = result_list[5:10] 
+		else:
+			self.pos = [0,0,0,0,0] 
 
 
 	def get_last_pos(self):
@@ -272,7 +389,8 @@ class Robot():
 	def housekeeping(self):
 		self.manual_end()
 		time.sleep(0.5)
-		#self.ser.close() ----- 				------change for lab
+		if self.ser!=False: #if not atHome
+			self.ser.close()
 		print('housekeeping completed - exiting')	
 
 	def serial_write(self, toWrite):
@@ -291,6 +409,8 @@ class cameraRobot():
 			self.ser=False	
 		self.speed=robotSpeed
 		self.shared_camera_pos = shared_camera_pos
+		self.square_pressed=False 
+
 
 		self.calculate_pos()
 		time.sleep(0.5)
@@ -307,7 +427,7 @@ class cameraRobot():
 	
 
 	def move(self, axes,buttons ):
-		self.update_pos(buttons[6])
+		self.update_pos(buttons[2])
 		if max(buttons[11:15]):
 			if not self.arrowsPressed: #if some arrow button has just been pressed
 				self.manual_end()
@@ -330,33 +450,42 @@ class cameraRobot():
 				time.sleep(0.5)
 
 				self.pos = new_position
-				self.shared_camera_pos = new_position   #--- change for threads
+				self.shared_camera_pos = new_position   
 				self.arrowsPressed = True
 				self.manual_start_midle()
 
 		else:
 			self.arrowsPressed = False
-			self.manual_pitch(axes)
+			self.manual_move(axes, buttons)
 
-	def update_pos(self, options_button):
-		if not options_button: #circle is not pressed
-			self.options_pressed=False 
+	def update_pos(self, square_button):
+		if not square_button: #square is not pressed
+			self.square_pressed=False 
 			return
 
-		if self.options_pressed and options_button: #circe was pressed and still is - no changes
+		if self.square_pressed and square_button: #square was pressed and still is - no changes
 			return None
-		elif not self.options_pressed and options_button:  #circle was not pressed and now is pressed - send information of current pos
+		elif not self.square_pressed and square_button:  #square was not pressed and now is pressed - get current position of robot
 			self.manual_end()
 			self.calculate_pos()
 			self.manual_start_midle()
+			self.square_pressed=True 
+		
 
 
-	def manual_pitch(self,axes):
+	def manual_move(self,axes, buttons):
+		#pitch:
 		if axes[4] > 0:
 			self.serial_write(b'R \r')
-
 		elif axes[5] > 0:
 			self.serial_write(b'4 \r')
+
+		#base joint
+		if buttons[4] - buttons[6] >0:
+			self.serial_write(b'1 \r')
+		elif buttons[4] - buttons[6] <0:
+			self.serial_write(b'Q \r')
+			
 
 	def set_position(self, position_values):
 		
@@ -404,18 +533,20 @@ class cameraRobot():
 		time.sleep(0.3)
 		self.serial_write(b'LISTPV POSITION \r')
 		time.sleep(0.05)
-		#						-------change for lanb
-		""" clean_buffer(self.ser)
-		robot_output = read_and_wait(self.ser,0.15)
-		output_after = robot_output.replace(': ', ':').replace('>','')
-		pairs=output_after.split() #separate in pairs of the form 'n:m'
-		result_list=[]
-		for pair in pairs:
-			[key, value] = pair.split(':')
-			result_list.append(int(value))
-		self.joints = result_list[0:5]
-		self.pos = result_list[5:10]  """
-		self.pos =[0,0,0,0,0]
+		if self.ser!=False: #not at home - in the lab
+			clean_buffer(self.ser)
+			robot_output = read_and_wait(self.ser,0.15)
+			output_after = robot_output.replace(': ', ':').replace('>','')
+			pairs=output_after.split() #separate in pairs of the form 'n:m'
+			result_list=[]
+			for pair in pairs:
+				[key, value] = pair.split(':')
+				result_list.append(int(value))
+			self.joints = result_list[0:5]
+			self.pos = result_list[5:10]
+		else:
+			self.pos =[0,0,0,0,0]
+		self.shared_camera_pos = self.pos
 
 	def get_pos(self):
 		#function to get axis position values
@@ -436,6 +567,7 @@ class cameraRobot():
 	def housekeeping(self):
 		self.manual_end()
 		time.sleep(0.5)
-		#self.ser.close()    --------------change for lab
+		if self.ser!=False: #not at home
+			self.ser.close()    
 		print('housekeeping completed - exiting')	
 		

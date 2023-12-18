@@ -42,7 +42,7 @@ def clean_buffer(ser):
 
 
 class Robot():
-    def __init__(self, comPort='COM3', speed=10):
+    def __init__(self, comPort='COM4', speed=10):
         self.ser = serial.Serial(comPort, baudrate=9600, bytesize=8, timeout=2, parity='N', xonxoff=0) 
         print("COM port in use: {0}".format(self.ser.name))		
         self.speed = speed
@@ -53,9 +53,9 @@ class Robot():
         self.ser.write(b'~ \r')
         self.ser.write(b's \r')
         self.ser.write(f'{self.speed} \r'.encode('utf-8'))
-        time.sleep(0.4)
-        self.ser.write(b'J \r')
-        time.sleep(0.3)
+        time.sleep(0.8)
+        self.ser.write(b'X \r')
+        time.sleep(0.8)
     
     def manual_start_midle(self):
         self.ser.write(b'\r')
@@ -144,7 +144,7 @@ class Robot():
         self.manual_start_midle()
         print('concluded')
 
-        return self.joints
+        return self.pos
     def get_last_joints(self):
 		#function to get joint values
 		#run calculate_pos before running get_joints to update the joint values
@@ -163,7 +163,7 @@ def robot_controll_main_loop():
     clock = pygame.time.Clock()
     bisturi_robot=Robot()
     
-    f=open('Data_joints.txt','w')
+    f=open('Data_xyz.txt','w')
     message= {'Q':0, '1':0,  'W':0,'2':0, 'E':0,'3':0,  'R':0,'4':0, 'T':0,'5':0,}
     delta_pos=[]
     initial_pos = bisturi_robot.get_pos()
@@ -179,7 +179,7 @@ def robot_controll_main_loop():
                     count=0
 
             
-            """  if count > FPS:  # happens one time each second
+            if count > FPS:  # happens one time each second
                 print('saving')
                 count = -1
                 final_pos = bisturi_robot.get_pos()
@@ -189,7 +189,7 @@ def robot_controll_main_loop():
                 f.write(f'{delta_pos}   {message}\n')
                 message = {'Q': 0, '1': 0, 'W': 0, '2': 0, 'E': 0, '3': 0, 'R': 0, '4': 0, 'T': 0, '5': 0}
                 delta_pos = []
-                initial_pos = final_p """
+                initial_pos = final_pos
 
             tocheck=[abs(axes[i]) for i in range(len(axes)-2)]
             if max(buttons)>0 or max(tocheck)>0.2 and count!=-1:
