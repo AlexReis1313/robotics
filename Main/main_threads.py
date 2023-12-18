@@ -9,12 +9,7 @@ import socket
 
 from joystick_functions import *
 from robot_classes_manual import *
-
-
-
-
-
-
+from communication_client import *
 
 def do_obstacle_avoidance(robot,shared_camera_pos, bisturi_pose, calibration_matrix):
 	#sharedData[1] = robot.get_last_pos()
@@ -49,7 +44,6 @@ def camera_robot_loop(joystick_queue, shared_camera_pos):
 		pass
 	finally:
 		camera_robot.housekeeping() #this ends the manual mode and closes the serial port
-
 
 
 def bisturi_robot_controll_loop(joystick_queue, shared_camera_pos, info_computer_share):
@@ -93,60 +87,62 @@ def bisturi_robot_controll_loop(joystick_queue, shared_camera_pos, info_computer
 			robot.housekeeping() #this ends the manual mode and closes the serial port
 
 
+# def computer_comunication_loop(info_computer_share):
+# 	FPS=10
+# 	client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+# 	client.connect(('194.210.177.59', 50000))
+# 	clock = pygame.time.Clock()
+# 	last_state = info_computer_share['state']
+# 	last_bisturi_pos=info_computer_share['last_bisturi_pos']
+# 	last_cutting_plan = info_computer_share['cutting_plan']
+# 	k=True
+# 	while k:
+# 			data = client.recv(1024)
+# 			if not data:
+# 				k=False
 
-def computer_comunication_loop(info_computer_share):
-	FPS=10
-	client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-	client.connect(('194.210.177.59', 50000))
+# 			elif data.decode()!='':#something was received
+# 				received = data.decode().split('\n')
+# 				#update info_computer_share parameters - like calibration matrix
+
+# 			else:#send data
+# 				message=''
+# 				if last_state != info_computer_share['state']:
+# 					last_state = info_computer_share['state']
+# 					message +=f'New State: {last_state}\n'
+
+# 				if last_bisturi_pos !=info_computer_share['last_bisturi_pos']:
+# 					last_bisturi_pos=info_computer_share['last_bisturi_pos']
+# 					message +=f'Bisturi Pose: {last_bisturi_pos}\n'
+
+# 				if 	last_cutting_plan != info_computer_share['cutting_plan']:
+# 					last_cutting_plan = info_computer_share['cutting_plan']
+# 					message +=f'Cutting Plan: {last_cutting_plan}\n'
+				
+				
+
+# 				len_mssg=len(message)
+# 				if len_mssg:
+# 					message+=f'{len_mssg}\n'#length of carachters to make sure the other computer has received the correct info
+
+# 				client.send(message.encode('utf-8'))
+
+# 				while True:#loop to check if the other computer received all the info. If it did not, resend information
+# 					check_received = client.recv(1024)
+# 					if bool(check_received.decode()):
+# 						break
+# 					else:
+# 						client.send(message.encode('utf-8'))
+
+
+# 			clock.tick(FPS)
+
+def send_robot_data(data):
+	FPS = 10
 	clock = pygame.time.Clock()
-	last_state = info_computer_share['state']
-	last_bisturi_pos=info_computer_share['last_bisturi_pos']
-	last_cutting_plan = info_computer_share['cutting_plan']
-	k=True
-	while k:
-			data = client.recv(1024)
-			if not data:
-				k=False
-
-			elif data.decode()!='':#something was received
-				received = data.decode().split('\n')
-				#update info_computer_share parameters - like calibration matrix
-
-			else:#send data
-				message=''
-				if last_state != info_computer_share['state']:
-					last_state = info_computer_share['state']
-					message +=f'New State: {last_state}\n'
-
-				if last_bisturi_pos !=info_computer_share['last_bisturi_pos']:
-					last_bisturi_pos=info_computer_share['last_bisturi_pos']
-					message +=f'Bisturi Pose: {last_bisturi_pos}\n'
-
-				if 	last_cutting_plan != info_computer_share['cutting_plan']:
-					last_cutting_plan = info_computer_share['cutting_plan']
-					message +=f'Cutting Plan: {last_cutting_plan}\n'
-				
-				
-
-				len_mssg=len(message)
-				if len_mssg:
-					message+=f'{len_mssg}\n'#length of carachters to make sure the other computer has received the correct info
-
-				client.send(message.encode('utf-8'))
-
-				while True:#loop to check if the other computer received all the info. If it did not, resend information
-					check_received = client.recv(1024)
-					if bool(check_received.decode()):
-						break
-					else:
-						client.send(message.encode('utf-8'))
-
-
-			clock.tick(FPS)
-
-    
-
-
+	HEADER, FORMAT, DISCONNECT_MESSAGE, ADDR = define_constants()
+	connect_to_server(ADDR, HEADER, FORMAT, DISCONNECT_MESSAGE,data)
+	clock.tick(FPS)
 
 def main():
 
@@ -161,7 +157,7 @@ def main():
 							#		4 finished running
 	robot_bisturi_thread = threading.Thread(target=bisturi_robot_controll_loop, args=(joystick_queue, shared_camera_pos, info_computer_share))
 	robot_camera_thread = threading.Thread(target=camera_robot_loop, args=(joystick_queue, shared_camera_pos))
-	computer_comunication_thread = threading.Thread(target=computer_comunication_loop, args=(info_computer_share))
+	send_data_thread = threading.Thread(target=send_robot_data, args=(info_computer_share))
 	
 	robot_bisturi_thread.start()
 	robot_camera_thread.start()
