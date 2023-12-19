@@ -137,12 +137,10 @@ def bisturi_robot_controll_loop(joystick_queue, shared_camera_pos, info_computer
 
 # 			clock.tick(FPS)
 
-def send_robot_data(data):
-	FPS = 10
-	clock = pygame.time.Clock()
+def send_robot_data():
+	FPS = 1
 	HEADER, FORMAT, DISCONNECT_MESSAGE, ADDR = define_constants()
-	connect_to_server(ADDR, HEADER, FORMAT, DISCONNECT_MESSAGE,data)
-	clock.tick(FPS)
+	connect_to_server(ADDR, HEADER, FORMAT, DISCONNECT_MESSAGE,FPS)
 
 def main():
 
@@ -157,7 +155,7 @@ def main():
 							#		4 finished running
 	robot_bisturi_thread = threading.Thread(target=bisturi_robot_controll_loop, args=(joystick_queue, shared_camera_pos, info_computer_share))
 	robot_camera_thread = threading.Thread(target=camera_robot_loop, args=(joystick_queue, shared_camera_pos))
-	send_data_thread = threading.Thread(target=send_robot_data, args=(info_computer_share))
+	send_data_thread = threading.Thread(target=send_robot_data)
 	
 	robot_bisturi_thread.start()
 	robot_camera_thread.start()
