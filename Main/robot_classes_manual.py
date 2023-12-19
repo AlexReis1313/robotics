@@ -137,13 +137,11 @@ class Robot():
 		time.sleep(0.2)
 
 	def manual_start_midle(self, *speed):
-		if not speed: #if speed argument is not given, use normal speed of robot
-			speed=self.speed
 		
+		time.sleep(0.15)
 		self.serial_write(b'\r')
 		self.serial_write(b'~ \r')
-		self.serial_write(b's \r')
-		self.serial_write(f'{speed} \r'.encode('utf-8'))
+		
 		#time.sleep(0.05)
 
 	def manual_end(self):
@@ -201,6 +199,7 @@ class Robot():
 			return None
 		elif not self.circle_Pressed and circleButton:  #circle was not pressed and now is pressed - send information of current pos
 			self.manual_end()
+			time.sleep(0.15)
 			self.calculate_pos()
 			self.joystick.rumble(0.4, 0.4, 200)
 			self.manual_start_midle()
@@ -225,16 +224,66 @@ class Robot():
 				self.joystick.rumble(0.8, 0.8, 100)
 				self.info_computer_share['state'] = 1 #robot is running normally
 
-
 			else:
 				self.plan_to_cut_status =True
 				self.joystick.rumble(0.8, 0.8, 400)
 				self.info_computer_share['state'] = 2 #robot is preaparing for cut
+				self.calculate_pos() #while comunication of state with other computer, calculate position - which will be used when cutting
 
+
+	def set_point(self,prefix, ptNumber, deltasXYZRP):
+		cartesian=['X','Y', 'Z', 'P', 'R']
+		self.serial_write(f'HERE {prefix}[{ptNumber}]\r'.encode('utf-8'))
+		for i, delta in enumerate(deltasXYZRP):
+			if delta!=0:
+				self.serial_write(f'SETPVC {prefix}[{ptNumber}] {cartesian[i]} {self.pos[i]+delta}\r'.encode('utf-8'))
+	def set_path(self,prefix ):
+		#POINT 1 - here
+		deltasXYZRP=[0]*5
+		self.set_point(prefix, 1, deltasXYZRP)
+		time.sleep(0.2)
+		#POINT 2 - tilt blade to 50 degrees
+		deltasXYZRP[3]=[50-self.pos[3]]
+		self.set_point(prefix, 2, deltasXYZRP)
+		time.sleep(0.2)	
+		#POINT 3- down
+		deltasXYZRP[2]=-abs(self.delta_cut[1])
+		self.set_point(prefix, 3, deltasXYZRP)
+		time.sleep(0.2)	
+		#POINT 4 - tilt blade to 75 degrees
+		deltasXYZRP[3]=[75-self.pos[3]]
+		self.set_point(prefix, 4, deltasXYZRP)
+		time.sleep(0.2)				
+		#POINT 5 - move in x 
+		deltasXYZRP[0]=-abs(self.delta_cut[0])
+		self.set_point(prefix, 5, deltasXYZRP)
+		time.sleep(0.2)	
+		#POINT 6 - move to orignal z position 
+		deltasXYZRP[2]=0
+		self.set_point(prefix, 6, deltasXYZRP)
+		time.sleep(0.2)	
+		#POINT 7 - move upwards, 5 cm away from gelatine
+		deltasXYZRP[2]=500
+		self.set_point(prefix, 7, deltasXYZRP)
+		time.sleep(0.2)	
 
 
 	def perform_cut(self):
 		print('Cutting')
+		path_comands = []
+		prefix='AA'
+		nrpoints=7
+		#creating an array of points
+		self.serial_write(f"DELP {prefix}\r".encode('utf-8'))
+		self.serial_write(b"YES\r")
+		self.serial_write(f"DIMP {prefix}[{nrpoints}]\r".encode('utf-8'))
+		time.sleep(0.5)
+		#defining the coordinates of the array of points:
+		self.set_path(prefix)		
+		time.sleep(1)
+		#move through all positions
+		self.serial_write(f'MOVES {prefix} 1 {nrpoints} {200 * nrpoints}\r'.encode('utf-8'))
+		print('Finished cutting')
 
 	def plan_to_cut(self, axes, buttons):
 		if buttons[15]: #touchpad clicked
@@ -278,19 +327,19 @@ class Robot():
 	def manual_move(self, axes,buttons ):
 		message= {'Q':0, '1':0,  'W':0,'2':0, 'E':0,'3':0,  'R':0,'4':0, 'T':0,'5':0,}
 
-		if axes[1] < -0.2:
+		if axes[0] < -0.2:
 			self.serial_write(b'Q \r')
 			message['Q']+=1
 
-		elif axes[1] > 0.2:
+		elif axes[0] > 0.2:
 			self.serial_write(b'1 \r')
 			message['1']+=1
 
-		if axes[0] < -0.2:
+		if axes[1] < -0.2:
 			self.serial_write(b'2 \r')
 			message['2']+=1
 
-		elif axes[0] > 0.2:
+		elif axes[1] > 0.2:
 			self.serial_write(b'W \r')
 			message['W']+=1
 
@@ -333,14 +382,18 @@ class Robot():
 		deltas.append(message['T']-message['5'])
 
 		if self.manual_mode =='X':
-			X_sensitivity =10 #left to adjust
+			XYZ_sensitivity =[] #from data
 			for i in self.pos:
-				self.pos[i]+=deltas[i]*X_sensitivity
+				self.pos[i]+=deltas[i]*XYZ_sensitivity[i]
 
 		elif self.manual_mode =='J':
-			J_sensitivity = 10 #left to adjust
+			J_sensitivity = 35.79 #from data
+			pitch_sensitivity=69.275 #from data
 			for i in self.joints:
-				self.joints[i]+=deltas[i]*J_sensitivity
+				if i ==3:
+					self.joints[i]+=deltas[i]*pitch_sensitivity
+				else:
+					self.joints[i]+=deltas[i]*J_sensitivity
 			self.pos =self.foward_kinematics()
 
 
@@ -358,12 +411,13 @@ class Robot():
 		time.sleep(180) # homing takes a few minutes ...
 	
 	def calculate_pos(self):
-	
+
 		self.serial_write(b'LISTPV POSITION \r')
 		time.sleep(0.05)
 		if self.ser!=False:
 			clean_buffer(self.ser)
 			robot_output = read_and_wait(self.ser,0.15)
+			print('ROBOTOUTPUT',robot_output )
 			output_after = robot_output.replace(': ', ':').replace('>','')
 			pairs=output_after.split() #separate in pairs of the form 'n:m'
 			result_list=[]
@@ -401,7 +455,7 @@ class Robot():
 
 class cameraRobot():
 	#this robot's y axis should be parallel to the table/jellow
-	def __init__(self, shared_camera_pos=None,atHome=False, robotSpeed=2, comPort='COM5' ):
+	def __init__(self, shared_camera_pos=None,atHome=False, robotSpeed=2, comPort='COM6' ):
 		if not atHome:
 			self.ser = serial.Serial(comPort, baudrate=9600, bytesize=8, timeout=2, parity='N', xonxoff=0) #change for lab ------------------------HERE FOR LAB
 			print("COM port in use: {0}".format(self.ser.name))	
@@ -411,15 +465,17 @@ class cameraRobot():
 		self.shared_camera_pos = shared_camera_pos
 		self.square_pressed=False 
 
-
+		time.sleep(2)
+		self.serial_write(b'\r')
+		time.sleep(0.2)
 		self.calculate_pos()
 		time.sleep(0.5)
-		self.serial_write(b'DEFP A')
+		self.serial_write(b'DEFP A \r')
 		time.sleep(0.8)
-		self.serial_write(b'HERE A')
+		self.serial_write(b'HERE A \r')
 		time.sleep(0.5)
 		
-		self.serial_write(f'SPEED {robotSpeed}'.encode('utf-8'))
+		self.serial_write(f'SPEED {robotSpeed}\r'.encode('utf-8'))
 		time.sleep(0.5)
 		self.initial_manual_start()
 		print('Ready')
@@ -434,19 +490,19 @@ class cameraRobot():
 				delta_z =0
 				delta_x=0
 				if buttons[11]-buttons[12]>0: #move up - arrow up pressed
-					delta_z=100
+					delta_z=400
 				elif buttons[11]-buttons[12]<0: #move down - arrow down pressed
-					delta_z=-100
+					delta_z=-400
 
 				if buttons[13]-buttons[14]>0: #move backward - arrow left pressed
-					delta_x=100
+					delta_x=400
 				elif buttons[13]-buttons[14]<0:#move foward - arrow right pressed
-					delta_x=-100
+					delta_x=-400
 
 				new_position = [self.pos[0]+delta_x, self.pos[1], self.pos[2]+delta_z, self.pos[3],self.pos[4] ]
 
 				self.set_position(new_position)
-				self.serial_write(b'Move A \r')
+				self.serial_write(b'Move A 200\r')
 				time.sleep(0.5)
 
 				self.pos = new_position
@@ -481,9 +537,9 @@ class cameraRobot():
 			self.serial_write(b'4 \r')
 
 		#base joint
-		if buttons[4] - buttons[6] >0:
+		if buttons[4] - buttons[6] <0:
 			self.serial_write(b'1 \r')
-		elif buttons[4] - buttons[6] <0:
+		elif buttons[4] - buttons[6] >0:
 			self.serial_write(b'Q \r')
 			
 
@@ -530,6 +586,7 @@ class cameraRobot():
 		time.sleep(180) # homing takes a few minutes ...
 	
 	def calculate_pos(self):
+		self.serial_write(b'\r')
 		time.sleep(0.3)
 		self.serial_write(b'LISTPV POSITION \r')
 		time.sleep(0.05)

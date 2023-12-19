@@ -21,7 +21,7 @@ def do_obstacle_avoidance(robot,shared_camera_pos, bisturi_pose, calibration_mat
 def camera_robot_loop(joystick_queue, shared_camera_pos):
 	FPS=40
 	clock = pygame.time.Clock()
-	camera_robot = cameraRobot(shared_camera_pos, atHome=True)
+	camera_robot = cameraRobot(shared_camera_pos, atHome=False)
 	axes=[0]*4+[-1,-1]
 	buttons=[0]*15
 	try:
@@ -50,7 +50,7 @@ def bisturi_robot_controll_loop(joystick_queue, shared_camera_pos, info_computer
 	joystick = initialize_joystick()
 	FPS=40
 	clock = pygame.time.Clock()
-	bisturi_robot=Robot(joystick,FPS, info_computer_share, atHome=True)
+	bisturi_robot=Robot(joystick,FPS, info_computer_share, atHome=False)
 	
 	robots=[bisturi_robot]
 	count=0
@@ -74,7 +74,7 @@ def bisturi_robot_controll_loop(joystick_queue, shared_camera_pos, info_computer
 				bisturi_robot.manual_start_midle() """
 
 			count+=1
-			bisturi_robot.manual_move(axes,buttons)
+			bisturi_robot.iterate(axes,buttons)
 			#do_obstacle_avoidance(bisturi_robot, shared_camera_pos, bisturi_pose = bisturi_robot.get_last_pos() , calibration_matrix = info_computer_share['calibration_matrix']), 
 			clock.tick(FPS)
 	
@@ -148,7 +148,7 @@ def main():
 
 	joystick_queue = queue.LifoQueue() #this queue will save values for the joystick's current state - it will be shared between the loops for both robots
 	shared_camera_pos =[0,0,0,0,0]
-	info_computer_share = {'state': -1, 'last_bisturi_pos': [0,0,0,0,0], 'calibration_matrix': None, 'cutting_plan':[0,0,0], }
+	info_computer_share = {'state': -1, 'last_bisturi_pos': [0,0,0,0,0], 'calibration_matrix': None, 'cutting_plan':[0,0], }
 							#state: -1 if in no state
 							#		0 if in calibration
 							#		1 if in running
