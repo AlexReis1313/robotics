@@ -18,10 +18,10 @@ def do_obstacle_avoidance(robot,shared_camera_pos, bisturi_pose, calibration_mat
 
 	return None
 
-def camera_robot_loop(joystick_queue, shared_camera_pos):
+def camera_robot_loop(athomeBool,joystick_queue, shared_camera_pos):
 	FPS=40
 	clock = pygame.time.Clock()
-	camera_robot = cameraRobot(shared_camera_pos, atHome=False)
+	camera_robot = cameraRobot(shared_camera_pos, comPort='COM3', atHome=athomeBool)
 	axes=[0]*4+[-1,-1]
 	buttons=[0]*15
 	try:
@@ -46,15 +46,12 @@ def camera_robot_loop(joystick_queue, shared_camera_pos):
 		camera_robot.housekeeping() #this ends the manual mode and closes the serial port
 
 
-def bisturi_robot_controll_loop(joystick_queue, shared_camera_pos, info_computer_share):
+def bisturi_robot_controll_loop(athomeBool,joystick_queue, shared_camera_pos, info_computer_share):
 	joystick = initialize_joystick()
 	FPS=40
 	clock = pygame.time.Clock()
-	bisturi_robot=Robot(joystick,FPS, info_computer_share, atHome=False)
-	
-	robots=[bisturi_robot]
+	bisturi_robot=Robot(joystick,FPS, info_computer_share ,comPort='COM3', atHome=athomeBool)
 	count=0
-	
 	try:
 		while True:
 		# Handle events
@@ -74,8 +71,8 @@ def bisturi_robot_controll_loop(joystick_queue, shared_camera_pos, info_computer
 				bisturi_robot.manual_start_midle() """
 
 			count+=1
-			bisturi_robot.iterate(axes,buttons)
 			#do_obstacle_avoidance(bisturi_robot, shared_camera_pos, bisturi_pose = bisturi_robot.get_last_pos() , calibration_matrix = info_computer_share['calibration_matrix']), 
+			bisturi_robot.iterate(axes,buttons)
 			clock.tick(FPS)
 	
 	except KeyboardInterrupt:
@@ -83,8 +80,7 @@ def bisturi_robot_controll_loop(joystick_queue, shared_camera_pos, info_computer
 		pass
 	finally:
 		pygame.quit()
-		for robot in robots:
-			robot.housekeeping() #this ends the manual mode and closes the serial port
+		bisturi_robot.housekeeping() #this ends the manual mode and closes the serial port
 
 
 # def computer_comunication_loop(info_computer_share):
@@ -143,7 +139,7 @@ def send_robot_data():
 	connect_to_server(ADDR, HEADER, FORMAT, DISCONNECT_MESSAGE,FPS)
 
 def main():
-
+	athomeBool=True
 	joystick_queue = queue.LifoQueue() #this queue will save values for the joystick's current state - it will be shared between the loops for both robots
 	shared_camera_pos =[0,0,0,0,0]
 	info_computer_share = {'state': -1, 'last_bisturi_pos': [0,0,0,0,0], 'calibration_matrix': None, 'cutting_plan':[0,0], }
@@ -153,8 +149,8 @@ def main():
 							#		2 if preparing for cut
 							#		3 doing cut
 							#		4 finished running
-	robot_bisturi_thread = threading.Thread(target=bisturi_robot_controll_loop, args=(joystick_queue, shared_camera_pos, info_computer_share))
-	robot_camera_thread = threading.Thread(target=camera_robot_loop, args=(joystick_queue, shared_camera_pos))
+	robot_bisturi_thread = threading.Thread(target=bisturi_robot_controll_loop, args=(athomeBool, joystick_queue, shared_camera_pos, info_computer_share))
+	robot_camera_thread = threading.Thread(target=camera_robot_loop, args=(athomeBool, joystick_queue, shared_camera_pos))
 	send_data_thread = threading.Thread(target=send_robot_data)
 	
 	robot_bisturi_thread.start()

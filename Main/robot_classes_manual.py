@@ -6,6 +6,9 @@ import queue
 import math
 
 from joystick_functions import*
+def foward_kinematics(joints): #left to implement
+		pos = joints
+		return pos
 
 def read_and_wait(ser, wait_time):
     #this function reads the information that the robot outputs to the computer and returns it as a string
@@ -40,7 +43,7 @@ def clean_buffer(ser):
 
 
 class Robot():
-	def __init__(self, joystick,FPS,info_computer_share=None,atHome=False, comPort='COM3', speedHigh=16, speedLow=8):
+	def __init__(self, joystick,FPS,info_computer_share=None,atHome=False, comPort='COM4', speedHigh=16, speedLow=8):
 		#initialization of the robot class
 		#this function opens the serial connection between the robot and the computer, defined the robot's speed % and calibrates the robot
 		if not atHome:
@@ -48,33 +51,17 @@ class Robot():
 			print("COM port in use: {0}".format(self.ser.name))		
 		else:
 			self.ser=False
-		#for the function that shares information with other computer
-		self.info_computer_share= info_computer_share 
-			#List where self.sharedData[0] is the robot's calibration pos, self.sharedData[1] is the current position of the robot,
-			#self.sharedData[2] is if joystick's square button state (to zero the coordenates shown on screen) 
-		self.circle_Pressed = False 
-
-		#Statements to use in the function update_speed
-		self.speedLow = speedLow
-		self.speed=self.speedHigh=speedHigh
-		self.previousHighSpeed=True
-		self.joystick = joystick
-		self.x_Pressed=False
-		self.tara_position =[0,0,0,0,0] #this is used to keep track of tara/zero 
-
-		self.plan_to_cut_status =False
-		self.triangle_Pressed = False 
-		self.delta_cut=[0,0,0]
-		self.stop_program=False
 		
+		self.define_initial_variables(info_computer_share,speedLow,speedHigh,joystick)
 		self.info_computer_share['state'] = 0 #in calibration
 		self.manual_mode ='J'
 
+		self.go_to_initial_position()
 		self.calculate_pos()
 		self.update_bisturi_pos_shared()
-
 		time.sleep(0.7)
 		self.initial_manual_start(type=self.manual_mode)
+		self.info_computer_share['state'] = 1 #robot is running
 
 		""" while True:
 			calibration_result = self.calibrate(FPS)
@@ -87,7 +74,36 @@ class Robot():
 			else: 
 				self.manual_end()
 				print('Try calibration again')  """
-		self.info_computer_share['state'] = 1 #robot is running
+		
+	def go_to_initial_position(self):
+		cartesian=['X','Y', 'Z', 'P', 'R']
+		initial_pos=[0,0,0,0,0] #defined experimentally
+		self.serial_write(b'DEFP A \r')
+		for i, coordenate in  enumerate(initial_pos):	
+			printToRobot=f'SETPVC A {cartesian[i]} {int(coordenate)}\r'
+			self.serial_write(printToRobot.encode('utf-8'))
+			time.sleep(0.2)
+		self.serial_write(b'MOVE A 7000\r')
+		time.sleep(8)
+
+
+	def define_initial_variables(self, info_computer_share,speedLow,speedHigh,joystick  ):
+		#for the function that shares information with other computer
+		self.info_computer_share= info_computer_share 
+			#List where self.sharedData[0] is the robot's calibration pos, self.sharedData[1] is the current position of the robot,
+			#self.sharedData[2] is if joystick's square button state (to zero the coordenates shown on screen) 
+		self.circle_Pressed = False 
+		#Statements to use in the function update_speed
+		self.speedLow = speedLow
+		self.speed=self.speedHigh=speedHigh
+		self.previousHighSpeed=True
+		self.joystick = joystick
+		self.x_Pressed=False
+		self.tara_position =[0,0,0,0,0] #this is used to keep track of tara/zero 
+		self.plan_to_cut_status =False
+		self.triangle_Pressed = False 
+		self.delta_cut=[0,0,0]
+		self.stop_program=False
 
 	def get_stop_program(self):
 		return self.stop_program
@@ -200,12 +216,16 @@ class Robot():
 		elif not self.circle_Pressed and circleButton:  #circle was not pressed and now is pressed - send information of current pos
 			self.manual_end()
 			time.sleep(0.15)
+			old_pos=self.pos
+			print('self.Pos estimated',old_pos)
 			self.calculate_pos()
+			delta_pose=[old_pos[i]-self.pos[i] for i in range(len(self.pos))]
+			print('Difference between estimation and pose', delta_pose)
 			self.joystick.rumble(0.4, 0.4, 200)
 			self.manual_start_midle()
 			self.tara_position=self.pos
 			self.update_bisturi_pos_shared()
-			self.circle_Pressed=True 
+			self.circle_Pressed=True                              
 
 
 
@@ -237,6 +257,9 @@ class Robot():
 		for i, delta in enumerate(deltasXYZRP):
 			if delta!=0:
 				self.serial_write(f'SETPVC {prefix}[{ptNumber}] {cartesian[i]} {self.pos[i]+delta}\r'.encode('utf-8'))
+				time.sleep(0.2)
+
+
 	def set_path(self,prefix ):
 		#POINT 1 - here
 		deltasXYZRP=[0]*5
@@ -269,7 +292,7 @@ class Robot():
 
 
 	def perform_cut(self):
-		print('Cutting')
+		print('Preparing to cut')
 		path_comands = []
 		prefix='AA'
 		nrpoints=7
@@ -283,6 +306,8 @@ class Robot():
 		time.sleep(1)
 		#move through all positions
 		self.serial_write(f'MOVES {prefix} 1 {nrpoints} {200 * nrpoints}\r'.encode('utf-8'))
+		print('Cutting')
+		time.sleep(2*nrpoints)
 		print('Finished cutting')
 
 	def plan_to_cut(self, axes, buttons):
@@ -307,7 +332,6 @@ class Robot():
 		if abs(axes[0])>0.3: #direction in degrees
 			self.delta_cut[2]+= axes[0]*sensitivity
 			show=True			
-
 
 		if show:
 			print('Delta to cut ',self.delta_cut)
@@ -368,10 +392,9 @@ class Robot():
 			message['E']+=1
 		
 
-		#we should update the self.pos info with an estimation, based on the input of manual movement
-			
-		#self.predict_next_pos(message)
-		#self.update_bisturi_pos_shared()
+		
+		self.predict_next_pos(message)#update the self.pos info with an estimation, based on the input of manual movement
+		self.update_bisturi_pos_shared()
 
 	def predict_next_pos(self, message):
 		deltas=[]
@@ -382,7 +405,11 @@ class Robot():
 		deltas.append(message['T']-message['5'])
 
 		if self.manual_mode =='X':
-			XYZ_sensitivity =[] #from data
+			XYZ_sensitivity =[-4.725378787878788,
+							-4.739024390243903,
+							-4.646980255516841,
+							-0.49864498644986455,
+							3.0248419150858177] #from data
 			for i in self.pos:
 				self.pos[i]+=deltas[i]*XYZ_sensitivity[i]
 
@@ -394,12 +421,10 @@ class Robot():
 					self.joints[i]+=deltas[i]*pitch_sensitivity
 				else:
 					self.joints[i]+=deltas[i]*J_sensitivity
-			self.pos =self.foward_kinematics()
+			self.pos =foward_kinematics(self.joints)
 
 
-	def foward_kinematics(self): #left to implement
-		pos = self.joints
-		return pos
+	
 	
 
 	def update_bisturi_pos_shared(self):
@@ -417,7 +442,7 @@ class Robot():
 		if self.ser!=False:
 			clean_buffer(self.ser)
 			robot_output = read_and_wait(self.ser,0.15)
-			print('ROBOTOUTPUT',robot_output )
+			print('ROBOT OUTPUT',robot_output )
 			output_after = robot_output.replace(': ', ':').replace('>','')
 			pairs=output_after.split() #separate in pairs of the form 'n:m'
 			result_list=[]
@@ -455,7 +480,7 @@ class Robot():
 
 class cameraRobot():
 	#this robot's y axis should be parallel to the table/jellow
-	def __init__(self, shared_camera_pos=None,atHome=False, robotSpeed=2, comPort='COM6' ):
+	def __init__(self, shared_camera_pos=None,atHome=False, robotSpeed=2, comPort='COM4' ):
 		if not atHome:
 			self.ser = serial.Serial(comPort, baudrate=9600, bytesize=8, timeout=2, parity='N', xonxoff=0) #change for lab ------------------------HERE FOR LAB
 			print("COM port in use: {0}".format(self.ser.name))	
@@ -468,19 +493,25 @@ class cameraRobot():
 		time.sleep(2)
 		self.serial_write(b'\r')
 		time.sleep(0.2)
+		self.go_to_initial_position()
 		self.calculate_pos()
-		time.sleep(0.5)
-		self.serial_write(b'DEFP A \r')
-		time.sleep(0.8)
-		self.serial_write(b'HERE A \r')
-		time.sleep(0.5)
-		
+
 		self.serial_write(f'SPEED {robotSpeed}\r'.encode('utf-8'))
 		time.sleep(0.5)
 		self.initial_manual_start()
 		print('Ready')
 
-	
+	def go_to_initial_position(self):
+		cartesian=['X','Y', 'Z', 'P', 'R']
+		initial_pos=[0,0,0,0,0] #defined experimentally
+		self.serial_write(b'DEFP A \r')
+		for i, coordenate in  enumerate(initial_pos):	
+			printToRobot=f'SETPVC A {cartesian[i]} {int(coordenate)}\r'
+			self.serial_write(printToRobot.encode('utf-8'))
+			time.sleep(0.2)
+		self.serial_write(b'MOVE A 7000\r')
+		time.sleep(8)
+
 
 	def move(self, axes,buttons ):
 		self.update_pos(buttons[2])
@@ -493,23 +524,18 @@ class cameraRobot():
 					delta_z=400
 				elif buttons[11]-buttons[12]<0: #move down - arrow down pressed
 					delta_z=-400
-
 				if buttons[13]-buttons[14]>0: #move backward - arrow left pressed
 					delta_x=400
 				elif buttons[13]-buttons[14]<0:#move foward - arrow right pressed
 					delta_x=-400
-
 				new_position = [self.pos[0]+delta_x, self.pos[1], self.pos[2]+delta_z, self.pos[3],self.pos[4] ]
-
 				self.set_position(new_position)
 				self.serial_write(b'Move A 200\r')
 				time.sleep(0.5)
-
 				self.pos = new_position
 				self.shared_camera_pos = new_position   
 				self.arrowsPressed = True
 				self.manual_start_midle()
-
 		else:
 			self.arrowsPressed = False
 			self.manual_move(axes, buttons)
@@ -526,21 +552,41 @@ class cameraRobot():
 			self.calculate_pos()
 			self.manual_start_midle()
 			self.square_pressed=True 
+			self.serial_write(b'con \r')
 		
 
 
 	def manual_move(self,axes, buttons):
+		message= {'Q':0, '1':0,  'R':0,'4':0}
 		#pitch:
 		if axes[4] > 0:
 			self.serial_write(b'R \r')
+			message['R']+=1
 		elif axes[5] > 0:
 			self.serial_write(b'4 \r')
-
+			message['4']+=1
 		#base joint
 		if buttons[4] - buttons[6] <0:
 			self.serial_write(b'1 \r')
+			message['1']+=1
 		elif buttons[4] - buttons[6] >0:
 			self.serial_write(b'Q \r')
+			message['Q']+=1
+		self.predict_next_pos(message)
+		self.pos = foward_kinematics(self.joints)
+		self.shared_camera_pos=self.pos
+
+
+	def predict_next_pos(self, message):
+		deltas=[]
+		deltas.append(message['Q']-message['1'])
+		deltas.append(message['R']-message['4'])
+		base_sensitivity = 35.79 #from data
+		pitch_sensitivity=69.275 #from data
+		self.joints[0]+=deltas[0]*base_sensitivity#base
+		self.joints[3]+=deltas[1]*pitch_sensitivity#pitch
+
+		self.pos =foward_kinematics(self.joints)
 			
 
 	def set_position(self, position_values):
@@ -551,7 +597,6 @@ class cameraRobot():
 			if self.pos[i] != position_values[i]:
 				#printToRobot=f'SHIFT AA BY {i+1} {int(delta)} \r'
 				printToRobot=f'SETPVC A {cartesian[i]} {int(coordenate)}\r'
-				print(printToRobot)
 				self.serial_write(printToRobot.encode('utf-8'))
 				time.sleep(0.5)
 
