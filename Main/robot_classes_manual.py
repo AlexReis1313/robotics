@@ -7,7 +7,7 @@ import math
 
 from joystick_functions import*
 def foward_kinematics(joints): #left to implement
-		pos = joints
+		pos = joints #placeholder
 		return pos
 
 def read_and_wait(ser, wait_time):
@@ -102,7 +102,7 @@ class Robot():
 		self.tara_position =[0,0,0,0,0] #this is used to keep track of tara/zero 
 		self.plan_to_cut_status =False
 		self.triangle_Pressed = False 
-		self.delta_cut=[0,0,0]
+		self.delta_cut=[0,0]
 		self.stop_program=False
 
 	def get_stop_program(self):
@@ -240,7 +240,7 @@ class Robot():
 			self.triangle_Pressed=True
 			if self.plan_to_cut_status:
 				self.plan_to_cut_status =False
-				self.delta_cut =[0,0,0]
+				self.delta_cut =[0,0]
 				self.joystick.rumble(0.8, 0.8, 100)
 				self.info_computer_share['state'] = 1 #robot is running normally
 
@@ -322,16 +322,16 @@ class Robot():
 		sensitivity=2
 		show=False
 
-		if abs(axes[2])>0.4:#length of cut
+		if abs(axes[0])>0.4:#length of cut
 			self.delta_cut[0]+=axes[2]*sensitivity
 			show=True
 		if abs(axes[3])>0.4: #depth
 			self.delta_cut[1]+=axes[3]*sensitivity
 			show=True
 
-		if abs(axes[0])>0.3: #direction in degrees
+		""" if abs(axes[0])>0.3: #direction in degrees
 			self.delta_cut[2]+= axes[0]*sensitivity
-			show=True			
+			show=True """			
 
 		if show:
 			print('Delta to cut ',self.delta_cut)

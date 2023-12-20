@@ -21,7 +21,7 @@ def start_server(ADDR, HEADER, FORMAT, DISCONNECT_MESSAGE):
     conn, addr = server.accept() #Waits for connection to server
     handle_client(conn,addr, HEADER, FORMAT, DISCONNECT_MESSAGE)
 
-def handle_client(conn, addr, HEADER, FORMAT, DISCONNECT_MESSAGE): #Runs for each client
+def handle_client(conn, addr, HEADER, FORMAT, DISCONNECT_MESSAGE, info_computer_share): #Runs for each client
     print(f'[NEW CONNECTION] {addr} connected.')
     connected = True
     cont = 0
@@ -35,8 +35,18 @@ def handle_client(conn, addr, HEADER, FORMAT, DISCONNECT_MESSAGE): #Runs for eac
             if data_r == DISCONNECT_MESSAGE:
                 print('[DISCONNECTING] GOODBYE!')
                 connected = False
+                info_computer_share['state']=4
             else:   
-                print(f'[NEW MESSAGE] {ast.literal_eval(data_r)}')
+                data = ast.literal_eval(data_r)
+                print(f'[NEW MESSAGE] {data}')
+                info_computer_share['state']=data[0]
+                info_computer_share['last_bisturi_pos']=data[1]
+                info_computer_share['cutting_plan']=data[-1]
+
+
+               
+
+                
 
         if cont <1: #Only send it on first iteration
         #Send information - calibration matrix
@@ -55,8 +65,10 @@ def get_calibration_matrix(): #Needs implemementing
     return [[1,2,3],[4,5,6],[7,8,9]]
 
 def main():
+    info_computer_share = {'state': -1, 'last_bisturi_pos': [0,0,0,0,0],  'cutting_plan':[0,0] }
+
     HEADER, FORMAT, DISCONNECT_MESSAGE, ADDR = define_constants()
-    start_server(ADDR, HEADER, FORMAT, DISCONNECT_MESSAGE)
+    start_server(ADDR, HEADER, FORMAT, DISCONNECT_MESSAGE, info_computer_share)
 
 if __name__ == '__main__':
     main()

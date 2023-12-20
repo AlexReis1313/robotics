@@ -62,6 +62,7 @@ def bisturi_robot_controll_loop(athomeBool,joystick_queue, shared_camera_pos, in
 
 			if quit or  bisturi_robot.get_stop_program():
 				joystick_queue.put(axes + buttons + [True])
+				info_computer_share['state']=4
 				return
 			""" if count> 5*FPS: #happens one time each second
 				count=0
@@ -133,16 +134,16 @@ def bisturi_robot_controll_loop(athomeBool,joystick_queue, shared_camera_pos, in
 
 # 			clock.tick(FPS)
 
-def send_robot_data():
+def send_robot_data(info_computer_share):
 	FPS = 1
 	HEADER, FORMAT, DISCONNECT_MESSAGE, ADDR = define_constants()
-	connect_to_server(ADDR, HEADER, FORMAT, DISCONNECT_MESSAGE,FPS)
+	connect_to_server(ADDR, HEADER, FORMAT, DISCONNECT_MESSAGE,FPS, info_computer_share)
 
 def main():
 	athomeBool=True
 	joystick_queue = queue.LifoQueue() #this queue will save values for the joystick's current state - it will be shared between the loops for both robots
 	shared_camera_pos =[0,0,0,0,0]
-	info_computer_share = {'state': -1, 'last_bisturi_pos': [0,0,0,0,0], 'calibration_matrix': None, 'cutting_plan':[0,0], }
+	info_computer_share = {'state': -1, 'last_bisturi_pos': [0,0,0,0,0], 'calibration_matrix': None, 'cutting_plan':[0,0]}
 							#state: -1 if in no state
 							#		0 if in calibration
 							#		1 if in running
@@ -151,7 +152,7 @@ def main():
 							#		4 finished running
 	robot_bisturi_thread = threading.Thread(target=bisturi_robot_controll_loop, args=(athomeBool, joystick_queue, shared_camera_pos, info_computer_share))
 	robot_camera_thread = threading.Thread(target=camera_robot_loop, args=(athomeBool, joystick_queue, shared_camera_pos))
-	send_data_thread = threading.Thread(target=send_robot_data)
+	send_data_thread = threading.Thread(target=send_robot_data,args=(info_computer_share))
 	
 	robot_bisturi_thread.start()
 	robot_camera_thread.start()

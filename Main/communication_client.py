@@ -13,15 +13,14 @@ def define_constants():
 
     return HEADER, FORMAT, DISCONNECT_MESSAGE, ADDR
 
-def connect_to_server(ADDR, HEADER, FORMAT, DISCONNECT_MESSAGE,FPS):
+def connect_to_server(ADDR, HEADER, FORMAT, DISCONNECT_MESSAGE,FPS, info_computer_share):
     client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     client.connect(ADDR)
-    start = time.time()
     clock = Clock()
     communicating = True
     cont = 0
     while communicating:
-        data = current_state(time.time() -start)
+        data = current_state(info_computer_share)
         information_exchange(data, FORMAT, HEADER, client,cont)
         cont +=1
         clock.tick(FPS)
@@ -49,19 +48,39 @@ def information_exchange(data, FORMAT, HEADER, client,cont):
             data_r = client.recv(data_r_length).decode(FORMAT)
             print(f'[CALIBRATION MATRIX] {ast.literal_eval(data_r)}') #transforms string to whatever without parsing problems
 
-def current_state(time): #placeholder using time
+""" def current_state(time): #placeholder using time
 
     if time < 5:
         return (-1, [0,0,0,0,0], None, [0,0,0])
     elif 5<= time < 9:
         return (2, [1,4,0,0,0], True, [0,0,39])
     else: 
-        return (4, [1,4,0,0,0], True, [0,0,39])
+        return (4, [1,4,0,0,0], True, [0,0,39]) """
 
-def main():
+def current_state(info_computer_share, last_shared_info): 
+    k=True
+    
+    while k: #only leaves this loop when a new state is found
+        if last_shared_info['state'] != info_computer_share['state']:
+            last_shared_info['state'] = info_computer_share['state']
+            k=False
+            
+        if last_shared_info['last_bisturi_pos'] !=info_computer_share['last_bisturi_pos']:
+            last_shared_info['last_bisturi_pos']=info_computer_share['last_bisturi_pos']
+            k=False
+
+        if 	last_shared_info['cutting_plan'] != info_computer_share['cutting_plan']:
+            last_shared_info['cutting_plan'] = info_computer_share['cutting_plan']
+            k=False	
+    
+
+    return tuple((last_shared_info['state'],last_shared_info['last_bisturi_pos'],True ,last_shared_info['cutting_plan']))
+    
+
+""" def main():
     FPS = 1
     HEADER, FORMAT, DISCONNECT_MESSAGE, ADDR = define_constants()
     connect_to_server(ADDR, HEADER, FORMAT, DISCONNECT_MESSAGE,FPS)
 
 if __name__ == '__main__':
-    main()
+    main() """
