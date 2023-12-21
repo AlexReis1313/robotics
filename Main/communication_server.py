@@ -48,7 +48,7 @@ def handle_client(conn, addr, HEADER, FORMAT, DISCONNECT_MESSAGE, info_computer_
 
                 
 
-        if cont <1: #Only send it on first iteration
+        if cont ==0: #Only send it on first iteration
         #Send information - calibration matrix
             cal_matrix = str(get_calibration_matrix())
             data_s = cal_matrix.encode(FORMAT)
