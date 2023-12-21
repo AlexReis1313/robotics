@@ -11,12 +11,29 @@ from joystick_functions import *
 from robot_classes_manual import *
 from communication_client import *
 
-def do_obstacle_avoidance(robot,shared_camera_pos, bisturi_pose, calibration_matrix):
-	#sharedData[1] = robot.get_last_pos()
+def do_obstacle_avoidance(bisturi_pose, camera_pose, L):
+    safety_distance = 10
+    
+    transformation_matrix = np.array([
+        [-1, 0, 0, L],
+        [0, -1, 0, 0],
+        [0, 0, 1, 0],
+        [0, 0, 0, 1]
+    ])
 
-	#this function should then do obstacle avoindace. This has not yet been done
-
-	return None
+    # don't exactly know how to get the positions, for now let's say the inputs are given
+    end_effector1_R1 = np.concatenate([bisturi_pose[5:8], np.array([1])])
+    end_effector2_R2 = np.concatenate([camera_pose[5:8], np.array([1])])
+    end_effector2_R1 = np.dot(transformation_matrix, end_effector2_R2)
+    
+    # Calculate the Euclidean distance between the two points
+    distance = np.linalg.norm(end_effector1_R1 - end_effector2_R1)
+    
+    # Check for collision and return result
+    if distance > safety_distance:
+        return 1  # No collision
+    else:
+        return -1  # Collision
 
 def camera_robot_loop(athomeBool,joystick_queue, shared_camera_pos):
 	FPS=40
