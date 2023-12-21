@@ -16,6 +16,18 @@ def foward_kinematics(joints,robot_type): #left to implement
 			raise TypeError('Invalid robot_type') 
 		theta1,theta2,theta3,theta4,theta5 = joints
 
+		offset1 = 0 #I still need to see what are the robot values in homing position and subtract them here
+		offset2 = 0
+		offset3 = 0
+		offset4 = 0 
+		offset5 = 0
+
+		theta1 += offset1
+		theta2 += offset2
+		theta3 += offset3
+		theta4 += offset4
+		theta5 += offset5
+
 		T_01 = np.matrix([[math.cos(theta1),math.sin(theta1),0,0],
 					[math.sin(theta1),math.cos(theta1),0,0],
 					[0,0,1,0],
