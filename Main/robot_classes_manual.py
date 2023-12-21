@@ -43,7 +43,7 @@ def clean_buffer(ser):
 
 
 class Robot():
-	def __init__(self, joystick,FPS,info_computer_share=None,atHome=False, comPort='COM4', speedHigh=16, speedLow=8):
+	def __init__(self, joystick,FPS,info_computer_share=None,atHome=False, comPort='COM4', speedHigh=16, speedLow=10):
 		#initialization of the robot class
 		#this function opens the serial connection between the robot and the computer, defined the robot's speed % and calibrates the robot
 		if not atHome:
@@ -52,16 +52,21 @@ class Robot():
 		else:
 			self.ser=False
 		
+		self.message= {'Q':0, '1':0,  'W':0,'2':0, 'E':0,'3':0,  'R':0,'4':0, 'T':0,'5':0,}
+		self.f=open('Data_precision_xyz.txt','w')
+
+
 		self.define_initial_variables(info_computer_share,speedLow,speedHigh,joystick)
 		self.info_computer_share['state'] = 0 #in calibration
-		self.manual_mode ='J'
+		self.manual_mode ='X'
 
-		self.go_to_initial_position()
+		#self.go_to_initial_position()
 		self.calculate_pos()
 		self.update_bisturi_pos_shared()
 		time.sleep(0.7)
 		self.initial_manual_start(type=self.manual_mode)
 		self.info_computer_share['state'] = 1 #robot is running
+		print('Bisturi Ready')
 
 		""" while True:
 			calibration_result = self.calibrate(FPS)
@@ -77,14 +82,16 @@ class Robot():
 		
 	def go_to_initial_position(self):
 		cartesian=['X','Y', 'Z', 'P', 'R']
-		initial_pos=[0,0,0,0,0] #defined experimentally
+		joints=['1','2', '3', '4', '5']
+		initial_pos_x=[4254,-520,4636,-648,-201] #defined experimentally
+		initial_joints=[1844,-4984,-14729,-11331,600]
 		self.serial_write(b'DEFP A \r')
-		for i, coordenate in  enumerate(initial_pos):	
-			printToRobot=f'SETPVC A {cartesian[i]} {int(coordenate)}\r'
+		for i, coordenate in  enumerate(initial_joints):	
+			printToRobot=f'SETPV A {joints[i]} {int(coordenate)}\r'
 			self.serial_write(printToRobot.encode('utf-8'))
 			time.sleep(0.2)
-		self.serial_write(b'MOVE A 7000\r')
-		time.sleep(8)
+		self.serial_write(b'MOVE A 600\r')
+		time.sleep(6)
 
 
 	def define_initial_variables(self, info_computer_share,speedLow,speedHigh,joystick  ):
@@ -175,7 +182,7 @@ class Robot():
 		if self.x_Pressed and button_Is_Pressed: #x was pressed and still is - no changes to sensitivity
 			return False
 		elif not self.x_Pressed and button_Is_Pressed: #x was not pressed and now is pressed - change sensitivity from Low to high or High to low
-			if not self.previousHighSpeed: #robot was previously with low speed - and will now have high speed
+			if self.manual_mode == 'X': #robot was previously with low speed - and will now have high speed
 				self.manual_end()
 				time.sleep(0.1)
 				self.speed=self.speedHigh
@@ -217,15 +224,30 @@ class Robot():
 			self.manual_end()
 			time.sleep(0.15)
 			old_pos=self.pos
-			print('self.Pos estimated',old_pos)
+			old_joints=self.joints
+			print('message', self.message)
 			self.calculate_pos()
 			delta_pose=[old_pos[i]-self.pos[i] for i in range(len(self.pos))]
 			print('Difference between estimation and pose', delta_pose)
+			if self.manual_mode=='X':
+				print('self.Pos estimated',old_pos)
+				delta_pose=[old_pos[i]-self.pos[i] for i in range(len(self.pos))]
+				print('Difference between estimation and pose', delta_pose)
+				string=str('XYZ message'+ str(self.message)+ '\nDifference between estimation and pose'+ str(delta_pose)+'\n'+ 'predicted and true poses'+str(old_pos) + str(self.pos)+'\n\n')
+			else:
+				print('self.joints estimated',old_joints)
+				delta_joints = [old_joints[i]-self.joints[i] for i in range(len(self.joints))]
+				string=str('JOINTS message'+ str(self.message)+ '\nDifference between estimation and joints'+ str(delta_joints)+'\n'+ 'predicted and true joints'+str(old_joints) + str(self.joints)+'\n\n')
+
+			self.f.write(string)
 			self.joystick.rumble(0.4, 0.4, 200)
 			self.manual_start_midle()
 			self.tara_position=self.pos
 			self.update_bisturi_pos_shared()
-			self.circle_Pressed=True                              
+			self.circle_Pressed=True  
+			self.message= {'Q':0, '1':0,  'W':0,'2':0, 'E':0,'3':0,  'R':0,'4':0, 'T':0,'5':0,}
+			
+                            
 
 
 
@@ -243,52 +265,60 @@ class Robot():
 				self.delta_cut =[0,0]
 				self.joystick.rumble(0.8, 0.8, 100)
 				self.info_computer_share['state'] = 1 #robot is running normally
+				self.manual_start_midle()
 
 			else:
 				self.plan_to_cut_status =True
 				self.joystick.rumble(0.8, 0.8, 400)
 				self.info_computer_share['state'] = 2 #robot is preaparing for cut
+				self.manual_end()
+				time.sleep(0.5)
 				self.calculate_pos() #while comunication of state with other computer, calculate position - which will be used when cutting
 
 
 	def set_point(self,prefix, ptNumber, deltasXYZRP):
 		cartesian=['X','Y', 'Z', 'P', 'R']
 		self.serial_write(f'HERE {prefix}[{ptNumber}]\r'.encode('utf-8'))
+		time.sleep(0.5)
+		print('deltasxyz',deltasXYZRP)
 		for i, delta in enumerate(deltasXYZRP):
 			if delta!=0:
+				
 				self.serial_write(f'SETPVC {prefix}[{ptNumber}] {cartesian[i]} {self.pos[i]+delta}\r'.encode('utf-8'))
-				time.sleep(0.2)
+				time.sleep(0.4)
 
 
 	def set_path(self,prefix ):
+		self.delta_cut=[500,-300]#x,z
+		
 		#POINT 1 - here
 		deltasXYZRP=[0]*5
 		self.set_point(prefix, 1, deltasXYZRP)
-		time.sleep(0.2)
+		time.sleep(0.4)
 		#POINT 2 - tilt blade to 50 degrees
-		deltasXYZRP[3]=[50-self.pos[3]]
+		deltasXYZRP[3]=-500-self.pos[3]
 		self.set_point(prefix, 2, deltasXYZRP)
-		time.sleep(0.2)	
+		time.sleep(0.4)	
 		#POINT 3- down
 		deltasXYZRP[2]=-abs(self.delta_cut[1])
 		self.set_point(prefix, 3, deltasXYZRP)
-		time.sleep(0.2)	
+		time.sleep(0.4)	
 		#POINT 4 - tilt blade to 75 degrees
-		deltasXYZRP[3]=[75-self.pos[3]]
+		deltasXYZRP[3]=-750-self.pos[3]
 		self.set_point(prefix, 4, deltasXYZRP)
-		time.sleep(0.2)				
+		time.sleep(0.4)				
 		#POINT 5 - move in x 
 		deltasXYZRP[0]=-abs(self.delta_cut[0])
 		self.set_point(prefix, 5, deltasXYZRP)
-		time.sleep(0.2)	
+		time.sleep(0.4)	
 		#POINT 6 - move to orignal z position 
 		deltasXYZRP[2]=0
 		self.set_point(prefix, 6, deltasXYZRP)
-		time.sleep(0.2)	
+		time.sleep(0.4)	
 		#POINT 7 - move upwards, 5 cm away from gelatine
 		deltasXYZRP[2]=500
 		self.set_point(prefix, 7, deltasXYZRP)
-		time.sleep(0.2)	
+		time.sleep(0.4)	
 
 
 	def perform_cut(self):
@@ -297,33 +327,40 @@ class Robot():
 		prefix='AA'
 		nrpoints=7
 		#creating an array of points
+		self.serial_write(f"DIMP {prefix}[{20}]\r".encode('utf-8'))
+		time.sleep(0.7)
 		self.serial_write(f"DELP {prefix}\r".encode('utf-8'))
+		time.sleep(0.2)
 		self.serial_write(b"YES\r")
+		time.sleep(0.2)
 		self.serial_write(f"DIMP {prefix}[{nrpoints}]\r".encode('utf-8'))
 		time.sleep(0.5)
 		#defining the coordinates of the array of points:
 		self.set_path(prefix)		
 		time.sleep(1)
 		#move through all positions
-		self.serial_write(f'MOVES {prefix} 1 {nrpoints} {200 * nrpoints}\r'.encode('utf-8'))
+		self.serial_write(f'MOVES {prefix} 2 {nrpoints} {200 * nrpoints}\r'.encode('utf-8'))
 		print('Cutting')
 		time.sleep(2*nrpoints)
 		print('Finished cutting')
 
 	def plan_to_cut(self, axes, buttons):
 		if buttons[15]: #touchpad clicked
-			self.joystick.rumble(0.6, 0.9, 800)
+			self.joystick.rumble(1, 1, 200)#rumble
+			time.sleep(0.15)
 			self.info_computer_share['state'] = 3 #robot is cutting
+			self.joystick.rumble(0.3, 0.3, 10)#rumble while waiting for cut
 			self.perform_cut()
 			self.plan_to_cut_status =False
 			self.info_computer_share['state'] = 1 #robot is running normally
+			self.manual_start_midle()
 			return
 		
 		sensitivity=2
 		show=False
 
 		if abs(axes[0])>0.4:#length of cut
-			self.delta_cut[0]+=axes[2]*sensitivity
+			self.delta_cut[0]+=axes[0]*sensitivity
 			show=True
 		if abs(axes[3])>0.4: #depth
 			self.delta_cut[1]+=axes[3]*sensitivity
@@ -391,7 +428,8 @@ class Robot():
 			self.serial_write(b'E \r') 
 			message['E']+=1
 		
-
+		for i in message:
+			self.message[i]+=message[i]
 		
 		self.predict_next_pos(message)#update the self.pos info with an estimation, based on the input of manual movement
 		self.update_bisturi_pos_shared()
@@ -410,17 +448,19 @@ class Robot():
 							-4.646980255516841,
 							-0.49864498644986455,
 							3.0248419150858177] #from data
-			for i in self.pos:
+			for i in range(len(self.pos)):
 				self.pos[i]+=deltas[i]*XYZ_sensitivity[i]
 
 		elif self.manual_mode =='J':
-			J_sensitivity = 35.79 #from data
-			pitch_sensitivity=69.275 #from data
-			for i in self.joints:
+			J_sensitivity = 35.79*self.speedHigh/self.speedLow #from data
+			pitch_sensitivity=69.275*self.speedHigh/self.speedLow #from data
+			for i in range(len(self.joints)):
 				if i ==3:
-					self.joints[i]+=deltas[i]*pitch_sensitivity
+					self.joints[i]+=pitch_sensitivity*deltas[i]
 				else:
-					self.joints[i]+=deltas[i]*J_sensitivity
+					self.joints[i]+=J_sensitivity*deltas[i]
+			
+
 			self.pos =foward_kinematics(self.joints)
 
 
@@ -453,6 +493,7 @@ class Robot():
 			self.pos = result_list[5:10] 
 		else:
 			self.pos = [0,0,0,0,0] 
+			self.joints=[0,0,0,0,0] 
 
 
 	def get_last_pos(self):
@@ -471,6 +512,7 @@ class Robot():
 		if self.ser!=False: #if not atHome
 			self.ser.close()
 		print('housekeeping completed - exiting')	
+		self.f.close()
 
 	def serial_write(self, toWrite):
 		if self.ser!=False: #if not atHome
@@ -499,17 +541,18 @@ class cameraRobot():
 		self.serial_write(f'SPEED {robotSpeed}\r'.encode('utf-8'))
 		time.sleep(0.5)
 		self.initial_manual_start()
-		print('Ready')
+		print('Camera ready')
 
 	def go_to_initial_position(self):
-		cartesian=['X','Y', 'Z', 'P', 'R']
-		initial_pos=[0,0,0,0,0] #defined experimentally
+		joints=['1','2', '3', '4', '5']
+		initial_pos=[-1222,-13423,-9414,-24732,47] #defined experimentally
 		self.serial_write(b'DEFP A \r')
+		time.sleep(0.2)
 		for i, coordenate in  enumerate(initial_pos):	
-			printToRobot=f'SETPVC A {cartesian[i]} {int(coordenate)}\r'
+			printToRobot=f'SETPVC A {joints[i]} {int(coordenate)}\r'
 			self.serial_write(printToRobot.encode('utf-8'))
 			time.sleep(0.2)
-		self.serial_write(b'MOVE A 7000\r')
+		self.serial_write(b'MOVE A 700\r')
 		time.sleep(8)
 
 
@@ -648,6 +691,7 @@ class cameraRobot():
 			self.pos = result_list[5:10]
 		else:
 			self.pos =[0,0,0,0,0]
+			self.joints=[0,0,0,0,0]
 		self.shared_camera_pos = self.pos
 
 	def get_pos(self):

@@ -50,7 +50,7 @@ def bisturi_robot_controll_loop(athomeBool,joystick_queue, shared_camera_pos, in
 	joystick = initialize_joystick()
 	FPS=40
 	clock = pygame.time.Clock()
-	bisturi_robot=Robot(joystick,FPS, info_computer_share ,comPort='COM3', atHome=athomeBool)
+	bisturi_robot=Robot(joystick,FPS, info_computer_share ,comPort='COM4', atHome=False)
 	count=0
 	try:
 		while True:
@@ -152,7 +152,7 @@ def main():
 							#		4 finished running
 	robot_bisturi_thread = threading.Thread(target=bisturi_robot_controll_loop, args=(athomeBool, joystick_queue, shared_camera_pos, info_computer_share))
 	robot_camera_thread = threading.Thread(target=camera_robot_loop, args=(athomeBool, joystick_queue, shared_camera_pos))
-	send_data_thread = threading.Thread(target=send_robot_data,args=(info_computer_share))
+	#send_data_thread = threading.Thread(target=send_robot_data,args=(info_computer_share))
 	
 	robot_bisturi_thread.start()
 	robot_camera_thread.start()
