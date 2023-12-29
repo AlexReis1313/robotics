@@ -112,7 +112,7 @@ class Robot():
 			self.ser=False
 		
 		self.message= {'Q':0, '1':0,  'W':0,'2':0, 'E':0,'3':0,  'R':0,'4':0, 'T':0,'5':0,}
-		self.f=open('Data_precision_xyz.txt','w')
+		self.f=open('Data_aquisition_29_12.txt','a')
 
 
 		self.define_initial_variables(info_computer_share,speedLow,speedHigh,joystick)
@@ -154,6 +154,7 @@ class Robot():
 		self.joystick = joystick
 		self.x_Pressed=False
 		self.tara_position =[0,0,0,0,0] #this is used to keep track of tara/zero 
+		self.joints_last=[0,0,0,0,0]
 		self.plan_to_cut_status =False
 		self.triangle_Pressed = False 
 		self.delta_cut=[0,0]
@@ -271,21 +272,27 @@ class Robot():
 			self.manual_end()
 			time.sleep(0.15)
 			
+
 			old_pos=self.pos.copy()
 			old_joints=self.joints.copy()
+
+
+
 			print('message', self.message)
 			self.calculate_pos()
 			delta_pose=[old_pos[i]-self.pos[i] for i in range(len(self.pos))]
 			print('Difference between estimation and pose', delta_pose)
+			print()
+
 			if self.manual_mode=='X':
-				print('self.Pos estimated',old_pos)
-				delta_pose=[old_pos[i]-self.pos[i] for i in range(len(self.pos))]
-				print('Difference between estimation and pose', delta_pose)
-				string=str('XYZ message'+ str(self.message)+ '\nDifference between estimation and pose'+ str(delta_pose)+'\n'+ 'predicted and true poses'+str(old_pos) + str(self.pos)+'\n\n')
+				delta_tara_pos=[-self.tara_position[i]+self.pos[i] for i in range(len(self.pos))]
+				
+				string=f'message:{self.message}  delta:{delta_tara_pos}   XYZ\n'
 			else:
-				print('self.joints estimated',old_joints)
-				delta_joints = [old_joints[i]-self.joints[i] for i in range(len(self.joints))]
-				string=str('JOINTS message'+ str(self.message)+ '\nDifference between estimation and joints'+ str(delta_joints)+'\n'+ 'predicted and true joints'+str(old_joints) + str(self.joints)+'\n\n')
+				
+				
+				delta_joints = [-self.joints_last[i]+self.joints[i] for i in range(len(self.joints))]
+				string=f'message:{self.message}  delta:{delta_joints}   JOINTS\n'
 
 			self.f.write(string)
 			self.joystick.rumble(0.4, 0.4, 200)
@@ -294,6 +301,7 @@ class Robot():
 			self.update_bisturi_pos_shared()
 			self.circle_Pressed=True  
 			self.message= {'Q':0, '1':0,  'W':0,'2':0, 'E':0,'3':0,  'R':0,'4':0, 'T':0,'5':0,}
+			self.joints_last=self.joints.copy()
 			
                             
 

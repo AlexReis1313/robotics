@@ -1,5 +1,6 @@
 import socket
 import ast
+import pygame
 
 def define_constants():
     HEADER = 64 #Header before message that tells length of the message that comes next. Wont be needed for project
@@ -25,6 +26,8 @@ def handle_client(conn, addr, HEADER, FORMAT, DISCONNECT_MESSAGE, info_computer_
     print(f'[NEW CONNECTION] {addr} connected.')
     connected = True
     cont = 0
+    FPS=20
+    clock=pygame.time.Clock()
     while connected:
 
         #Receive information
@@ -43,6 +46,7 @@ def handle_client(conn, addr, HEADER, FORMAT, DISCONNECT_MESSAGE, info_computer_
                 info_computer_share['last_bisturi_pos']=data[1]
                 info_computer_share['cutting_plan']=data[2]
                 info_computer_share['coliding']=data[3]
+        clock.tick(FPS)
 
 
 

@@ -8,7 +8,7 @@ import socket
 import cv2
 
 from communication_server import *
-from graphical_interface import *
+from graph_interface import *
 
 def receive_robot_data(info_computer_share):
     HEADER, FORMAT, DISCONNECT_MESSAGE, ADDR = define_constants()
