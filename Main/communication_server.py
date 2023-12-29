@@ -12,14 +12,14 @@ def define_constants():
 
     return HEADER, FORMAT, DISCONNECT_MESSAGE, ADDR
 
-def start_server(ADDR, HEADER, FORMAT, DISCONNECT_MESSAGE):
+def start_server(ADDR, HEADER, FORMAT, DISCONNECT_MESSAGE, info_computer_share =None):
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM) #tells server what type of ip address to expect and stream type of communication
     server.bind(ADDR)
     server.listen() #waiting for connection
     print(f'[LISTENING] Server is listening on {ADDR[0]}')
 
     conn, addr = server.accept() #Waits for connection to server
-    handle_client(conn,addr, HEADER, FORMAT, DISCONNECT_MESSAGE)
+    handle_client(conn,addr, HEADER, FORMAT, DISCONNECT_MESSAGE,info_computer_share )
 
 def handle_client(conn, addr, HEADER, FORMAT, DISCONNECT_MESSAGE, info_computer_share): #Runs for each client
     print(f'[NEW CONNECTION] {addr} connected.')
@@ -47,7 +47,7 @@ def handle_client(conn, addr, HEADER, FORMAT, DISCONNECT_MESSAGE, info_computer_
                
 
                 
-
+        """ 
         if cont ==0: #Only send it on first iteration
         #Send information - calibration matrix
             cal_matrix = str(get_calibration_matrix())
@@ -57,7 +57,7 @@ def handle_client(conn, addr, HEADER, FORMAT, DISCONNECT_MESSAGE, info_computer_
             send_length += b' '*(HEADER - len(send_length)) #add padding to equal to header length
             conn.send(send_length)
             conn.send(data_s)
-            cont += 1
+            cont += 1 """
     
     conn.close()
 
