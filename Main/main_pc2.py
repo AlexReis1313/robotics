@@ -5,6 +5,8 @@ import threading
 import queue
 import math
 import socket
+import cv2
+
 from communication_server import *
 from graphical_interface import *
 
@@ -13,19 +15,19 @@ def receive_robot_data(info_computer_share):
     start_server(ADDR, HEADER, FORMAT, DISCONNECT_MESSAGE,info_computer_share )
 
 def GUI_loop(info_computer_share):
-    main_graphycs() 
+    main_graphycs(info_computer_share) 
 
 
 
 def main():
-	
-	info_computer_share = {'state': -1, 'last_bisturi_pos': [0,0,0,0,0],  'cutting_plan':[0,0] }
-							#state: -1 if in no state
-							#		0 if in calibration
-							#		1 if in running
-							#		2 if preparing for cut
-							#		3 doing cut
-							#		4 finished running
+	info_computer_share['cutting_plan']
+	info_computer_share = {'state': -1, 'last_bisturi_pos': [0,0,0,0,0],  'cutting_plan':[0,0], 'coliding':False }
+							#state: -1 - Initializing
+							#		0 - Running joints mode
+							#		1 - Running xyz mode
+							#		2 - Preparing for cut
+							#		3 - Cutting
+							#		4 - Finished running
 	graphical_interface = threading.Thread(target=GUI_loop, args=(info_computer_share))
 	receive_data_server = threading.Thread(target=receive_robot_data,args=(info_computer_share))
 	

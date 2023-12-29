@@ -48,5 +48,7 @@ def main_graphycs():
     # Destroy all the windows
     cv2.destroyAllWindows()
 
+
+
 if __name__ == '__main__':
     main_graphycs() 
