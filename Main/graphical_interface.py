@@ -1,7 +1,7 @@
 import cv2
 import time
 
-def main_graphycs():
+def main_graphycs(info_computer_share):
     # Create a VideoCapture object
     vid = cv2.VideoCapture(0)
 
