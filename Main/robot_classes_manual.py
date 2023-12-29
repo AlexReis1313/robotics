@@ -112,12 +112,12 @@ class Robot():
 			self.ser=False
 		
 		self.message= {'Q':0, '1':0,  'W':0,'2':0, 'E':0,'3':0,  'R':0,'4':0, 'T':0,'5':0,}
-		self.f=open('Data_aquisition_29_12.txt','a')
+		self.f=open('Data_aquisition_dias.txt','a')
 
 
 		self.define_initial_variables(info_computer_share,speedLow,speedHigh,joystick)
 		self.manual_mode ='J'
-		#self.go_to_initial_position()
+		self.go_to_initial_position()
 		self.calculate_pos()
 
 		self.update_bisturi_pos_shared()
@@ -130,8 +130,7 @@ class Robot():
 	def go_to_initial_position(self):
 		cartesian=['X','Y', 'Z', 'P', 'R']
 		joints=['1','2', '3', '4', '5']
-		initial_pos_x=[4254,-520,4636,-648,-201] #defined experimentally
-		initial_joints=[1844,-4984,-14729,-11331,600]
+		initial_joints=[-2015,-4879,-18666,-10462,-330]#defined experimentally
 		self.serial_write(b'DEFP A \r')
 		for i, coordenate in  enumerate(initial_joints):	
 			printToRobot=f'SETPV A {joints[i]} {int(coordenate)}\r'
@@ -284,7 +283,7 @@ class Robot():
 			print('Difference between estimation and pose', delta_pose)
 			print()
 
-			if self.manual_mode=='X':
+			""" if self.manual_mode=='X':
 				delta_tara_pos=[-self.tara_position[i]+self.pos[i] for i in range(len(self.pos))]
 				
 				string=f'message:{self.message}  delta:{delta_tara_pos}   XYZ\n'
@@ -292,8 +291,9 @@ class Robot():
 				
 				
 				delta_joints = [-self.joints_last[i]+self.joints[i] for i in range(len(self.joints))]
-				string=f'message:{self.message}  delta:{delta_joints}   JOINTS\n'
+				string=f'message:{self.message}  delta:{delta_joints}   JOINTS\n' """
 
+			string=f'pos:{self.pos}   joints:{self.joints}\n'
 			self.f.write(string)
 			self.joystick.rumble(0.4, 0.4, 200)
 			self.manual_start_midle()
@@ -438,7 +438,7 @@ class Robot():
 
 		if show:
 			print('Delta to cut ',self.delta_cut)
-			self.info_computer_share['cutting_plan'] = self.delta_cut
+			self.info_computer_share['cutting_plan'] = [self.delta_cut[i]/10 for i in range(len(self.delta_cut))]
 
 	def iterate(self,axes,buttons ):
 		self.evaluate_triangle(buttons[3]) #enter or exit plan to cut mode if triangle is pressed
@@ -601,7 +601,7 @@ class cameraRobot():
 		time.sleep(2)
 		self.serial_write(b'\r')
 		time.sleep(0.2)
-		#self.go_to_initial_position()
+		self.go_to_initial_position()
 		self.calculate_pos()
 
 		self.serial_write(f'SPEED {robotSpeed}\r'.encode('utf-8'))
@@ -611,7 +611,7 @@ class cameraRobot():
 
 	def go_to_initial_position(self):
 		joints=['1','2', '3', '4', '5']
-		initial_pos=[-1222,-13423,-9414,-24732,47] #defined experimentally
+		initial_pos=[-303,-15473,-16732,-24732,47] #defined experimentally
 		self.serial_write(b'DEFP A \r')
 		time.sleep(0.2)
 		for i, coordenate in  enumerate(initial_pos):	

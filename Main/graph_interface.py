@@ -12,7 +12,7 @@ def main_graphycs(info_computer_share):
     # List of images corresponding to states
     state_images = [image1, image2, image3]
 
-    # Open a connection to the webcam (0 is usually the default camera), for the robot it may be 1
+    # Open a connection to the webcam (0 is usually the default camera), for the robot webcam, change to 1
     cap = cv2.VideoCapture(0)
 
     # Create a window for displaying both webcam stream and images
@@ -36,9 +36,10 @@ def main_graphycs(info_computer_share):
 
         # Get information from the shared dictionary
         state = info_computer_share['state']
-        last_bisturi_pos = info_computer_share['last_bisturi_pos']
+        last_bisturi_pos = info_computer_share['last_bisturi_pos'].copy()
         coliding = info_computer_share['coliding']
 
+        
         # Display state information on the left upper corner of the video
         state_text = ""
         if state == -1:
@@ -67,10 +68,10 @@ def main_graphycs(info_computer_share):
         if coliding:
             cv2.putText(combined_frame, "IMMINENT COLLISION", (width - 325, 50),
                         cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2, cv2.LINE_AA)
-
         # Convert the image to 3 channels (remove alpha channel) and copy to the bottom of the combined frame
         img_without_alpha = cv2.cvtColor(state_images[state], cv2.COLOR_BGRA2BGR)
         combined_frame[height:, :, :] = cv2.resize(img_without_alpha, (width, height))
+        
 
         # Resize the camera image to match the size of the other images
         camera_image_resized = cv2.resize(camera_image, (600, 300))  # Adjust the size as needed

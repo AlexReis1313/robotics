@@ -8,7 +8,7 @@ def define_constants():
     PORT = 5050 
     FORMAT = 'utf-8'
     DISCONNECT_MESSAGE = '!DISCONNECT'
-    SERVER = '194.210.158.147'
+    SERVER = '194.210.156.161'
     ADDR = (SERVER, PORT)
 
     return HEADER, FORMAT, DISCONNECT_MESSAGE, ADDR

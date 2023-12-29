@@ -40,7 +40,7 @@ def do_obstacle_avoidance(bisturi_pose, camera_pose, L, info_computer_share):
 
 def camera_robot_loop(FPS, athomeBool,joystick_queue, shared_camera_pos):
 	clock = pygame.time.Clock()
-	camera_robot = cameraRobot(shared_camera_pos, comPort='COM3', atHome=athomeBool)
+	camera_robot = cameraRobot(shared_camera_pos, comPort='COM4', atHome=True)
 	axes=[0]*4+[-1,-1]
 	buttons=[0]*15
 	try:
@@ -69,7 +69,7 @@ def camera_robot_loop(FPS, athomeBool,joystick_queue, shared_camera_pos):
 def bisturi_robot_controll_loop( FPS, L, athomeBool,joystick_queue, shared_camera_pos, info_computer_share):
 	joystick = initialize_joystick()
 	clock = pygame.time.Clock()
-	bisturi_robot=Robot(joystick, info_computer_share ,comPort='COM4', atHome=athomeBool)
+	bisturi_robot=Robot(joystick, info_computer_share ,comPort='COM4', atHome=True)
 	count=0
 	colision =False
 	try:
@@ -113,12 +113,12 @@ def bisturi_robot_controll_loop( FPS, L, athomeBool,joystick_queue, shared_camer
 
 
 def send_robot_data(FPS,info_computer_share):
-	FPS = 1
-	#HEADER, FORMAT, DISCONNECT_MESSAGE, ADDR = define_constants()
-	#connect_to_server(ADDR, HEADER, FORMAT, DISCONNECT_MESSAGE,FPS, info_computer_share)
-	while info_computer_share['state'] != 4:
-		print('info_computer_share', str(info_computer_share))
-		time.sleep(1)
+	FPS = 5
+	HEADER, FORMAT, DISCONNECT_MESSAGE, ADDR = define_constants()
+	connect_to_server(ADDR, HEADER, FORMAT, DISCONNECT_MESSAGE,FPS, info_computer_share)
+	#while info_computer_share['state'] != 4:
+	#	print('info_computer_share', str(info_computer_share))
+	#	time.sleep(1)
 def main():
 	FPS=40
 	L= 1000 #distance between base of the 2 robots
