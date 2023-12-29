@@ -1,0 +1,7 @@
+cam:[0, 0, 0, 0, 0]   bisturi:[0, 0, 0, 0, 0]   Not coliding
+cam:[0, 0, 0, 0, 0]   bisturi:[0, 0, 0, 0, 0]   Not coliding
+cam:[0, 0, 0, 0, 0]   bisturi:[0, 0, 0, 0, 0]   Coliding
+cam:[0, 0, 0, 0, 0]   bisturi:[0, 0, 0, 0, 0]   Coliding
+cam:[0, 0, 0, 0, 0]   bisturi:[0, 0, 0, 0, 0]   Coliding
+cam:[0, 0, 0, 0, 0]   bisturi:[0, 0, 0, 0, 0]   Not coliding
+cam:[0, 0, 0, 0, 0]   bisturi:[0, 0, 0, 0, 0]   Coliding

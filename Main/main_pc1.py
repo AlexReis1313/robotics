@@ -23,8 +23,8 @@ def do_obstacle_avoidance(bisturi_pose, camera_pose, L, info_computer_share):
 	])
 
 	# don't exactly know how to get the positions, for now let's say the inputs are given
-	end_effector1_R1 = np.concatenate([bisturi_pose[5:8], np.array([1])])
-	end_effector2_R2 = np.concatenate([camera_pose[5:8], np.array([1])])
+	end_effector1_R1 = np.concatenate([bisturi_pose[:3], np.array([1])])
+	end_effector2_R2 = np.concatenate([camera_pose[:3], np.array([1])])
 	end_effector2_R1 = np.dot(transformation_matrix, end_effector2_R2)
 	
 	# Calculate the Euclidean distance between the two points

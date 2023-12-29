@@ -102,7 +102,7 @@ def clean_buffer(ser):
 
 
 class Robot():
-	def __init__(self, joystick,info_computer_share=None,atHome=False, comPort='COM4', speedHigh=16, speedLow=10):
+	def __init__(self, joystick=None,info_computer_share=None,atHome=False, comPort='COM4', speedHigh=16, speedLow=10):
 		#initialization of the robot class
 		#this function opens the serial connection between the robot and the computer, defined the robot's speed % and calibrates the robot
 		if not atHome:
@@ -117,24 +117,15 @@ class Robot():
 
 		self.define_initial_variables(info_computer_share,speedLow,speedHigh,joystick)
 		self.manual_mode ='J'
-		self.go_to_initial_position()
+		#self.go_to_initial_position()
 		self.calculate_pos()
+
 		self.update_bisturi_pos_shared()
 		time.sleep(0.7)
 		self.initial_manual_start(type=self.manual_mode)
 		print('Bisturi Ready')
 
-		""" while True:
-			calibration_result = self.calibrate(FPS)
-			if  calibration_result: #calibration finished successfully
-				self.calibratedPos = self.pos
-				break
-			elif calibration_result ==False:#keyboard interrupt
-				self.stop_program=True
-				break
-			else: 
-				self.manual_end()
-				print('Try calibration again')  """
+		
 		
 	def go_to_initial_position(self):
 		cartesian=['X','Y', 'Z', 'P', 'R']
@@ -279,8 +270,9 @@ class Robot():
 		elif not self.circle_Pressed and circleButton:  #circle was not pressed and now is pressed - send information of current pos
 			self.manual_end()
 			time.sleep(0.15)
-			old_pos=self.pos
-			old_joints=self.joints
+			
+			old_pos=self.pos.copy()
+			old_joints=self.joints.copy()
 			print('message', self.message)
 			self.calculate_pos()
 			delta_pose=[old_pos[i]-self.pos[i] for i in range(len(self.pos))]
@@ -601,7 +593,7 @@ class cameraRobot():
 		time.sleep(2)
 		self.serial_write(b'\r')
 		time.sleep(0.2)
-		self.go_to_initial_position()
+		#self.go_to_initial_position()
 		self.calculate_pos()
 
 		self.serial_write(f'SPEED {robotSpeed}\r'.encode('utf-8'))
