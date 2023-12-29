@@ -20,7 +20,6 @@ def GUI_loop(info_computer_share):
 
 
 def main():
-	info_computer_share['cutting_plan']
 	info_computer_share = {'state': -1, 'last_bisturi_pos': [0,0,0,0,0],  'cutting_plan':[0,0], 'coliding':False }
 							#state: -1 - Initializing
 							#		0 - Running joints mode

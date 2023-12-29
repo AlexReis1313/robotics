@@ -41,7 +41,9 @@ def handle_client(conn, addr, HEADER, FORMAT, DISCONNECT_MESSAGE, info_computer_
                 print(f'[NEW MESSAGE] {data}')
                 info_computer_share['state']=data[0]
                 info_computer_share['last_bisturi_pos']=data[1]
-                info_computer_share['cutting_plan']=data[-1]
+                info_computer_share['cutting_plan']=data[2]
+                info_computer_share['coliding']=data[3]
+
 
 
                
@@ -65,7 +67,7 @@ def get_calibration_matrix(): #Needs implemementing
     return [[1,2,3],[4,5,6],[7,8,9]]
 
 def main():
-    info_computer_share = {'state': -1, 'last_bisturi_pos': [0,0,0,0,0],  'cutting_plan':[0,0] }
+    info_computer_share = {'state': -1, 'last_bisturi_pos': [0,0,0,0,0],  'cutting_plan':[0,0] ,'coliding':False}
 
     HEADER, FORMAT, DISCONNECT_MESSAGE, ADDR = define_constants()
     start_server(ADDR, HEADER, FORMAT, DISCONNECT_MESSAGE, info_computer_share)

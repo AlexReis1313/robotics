@@ -12,32 +12,33 @@ from joystick_functions import *
 from robot_classes_manual import *
 from communication_client import *
 
-def do_obstacle_avoidance(bisturi_pose, camera_pose, L):
-    safety_distance = 10
-    
-    transformation_matrix = np.array([
-        [-1, 0, 0, L],
-        [0, -1, 0, 0],
-        [0, 0, 1, 0],
-        [0, 0, 0, 1]
-    ])
+def do_obstacle_avoidance(bisturi_pose, camera_pose, L, info_computer_share):
+	safety_distance = 100
+	
+	transformation_matrix = np.array([
+		[-1, 0, 0, L],
+		[0, -1, 0, 0],
+		[0, 0, 1, 0],
+		[0, 0, 0, 1]
+	])
 
-    # don't exactly know how to get the positions, for now let's say the inputs are given
-    end_effector1_R1 = np.concatenate([bisturi_pose[5:8], np.array([1])])
-    end_effector2_R2 = np.concatenate([camera_pose[5:8], np.array([1])])
-    end_effector2_R1 = np.dot(transformation_matrix, end_effector2_R2)
-    
-    # Calculate the Euclidean distance between the two points
-    distance = np.linalg.norm(end_effector1_R1 - end_effector2_R1)
-    
-    # Check for collision and return result
-    if distance > safety_distance:
-        return 1  # No collision
-    else:
-        return -1  # Collision
+	# don't exactly know how to get the positions, for now let's say the inputs are given
+	end_effector1_R1 = np.concatenate([bisturi_pose[5:8], np.array([1])])
+	end_effector2_R2 = np.concatenate([camera_pose[5:8], np.array([1])])
+	end_effector2_R1 = np.dot(transformation_matrix, end_effector2_R2)
+	
+	# Calculate the Euclidean distance between the two points
+	distance = np.linalg.norm(end_effector1_R1 - end_effector2_R1)
+	
+	# Check for collision and return result
+	if distance > safety_distance:
+		info_computer_share['colision']=False
+		return False  # No collision
+	else:
+		info_computer_share['colision']=True
+		return True  # Collision
 
-def camera_robot_loop(athomeBool,joystick_queue, shared_camera_pos):
-	FPS=40
+def camera_robot_loop(FPS, athomeBool,joystick_queue, shared_camera_pos):
 	clock = pygame.time.Clock()
 	camera_robot = cameraRobot(shared_camera_pos, comPort='COM3', atHome=athomeBool)
 	axes=[0]*4+[-1,-1]
@@ -49,13 +50,14 @@ def camera_robot_loop(athomeBool,joystick_queue, shared_camera_pos):
 			if not joystick_queue.empty(): #if there are events waiting in joystick queue
 				joystick_values = joystick_queue.get()
 				#print('Joystick at camera',joystick_values)
-				axes, buttons, quit = joystick_values[:6], joystick_values[6:-1], joystick_values[-1]
+				axes, buttons, quit, coliding = joystick_values[:6], joystick_values[6:-2], joystick_values[-2], joystick_values[-1]
 				while not joystick_queue.empty():
 					joystick_queue.get()
 
 			if quit:
 				return
-			camera_robot.move(axes, buttons)
+			if not coliding:
+				camera_robot.move(axes, buttons)
 			clock.tick(FPS)
 	
 	except KeyboardInterrupt:
@@ -64,22 +66,22 @@ def camera_robot_loop(athomeBool,joystick_queue, shared_camera_pos):
 		camera_robot.housekeeping() #this ends the manual mode and closes the serial port
 
 
-def bisturi_robot_controll_loop(athomeBool,joystick_queue, shared_camera_pos, info_computer_share):
+def bisturi_robot_controll_loop( FPS, L, athomeBool,joystick_queue, shared_camera_pos, info_computer_share):
 	joystick = initialize_joystick()
-	FPS=40
 	clock = pygame.time.Clock()
-	bisturi_robot=Robot(joystick,FPS, info_computer_share ,comPort='COM4', atHome=False)
+	bisturi_robot=Robot(joystick, info_computer_share ,comPort='COM4', atHome=athomeBool)
 	count=0
+	colision =False
 	try:
 		while True:
 		# Handle events
 			quit=False
 			if pygame.event.peek(): #if there are events waiting in joystick queue
 				axes, buttons, quit = get_joystick(joystick)
-				joystick_queue.put(axes + buttons + [quit])
+				joystick_queue.put(axes + buttons + [quit]+[False]) #last false is for colision
 
-			if quit or  bisturi_robot.get_stop_program():
-				joystick_queue.put(axes + buttons + [True])
+			if quit:
+				joystick_queue.put(axes + buttons + [True]+[False])
 				info_computer_share['state']=4
 				return
 			""" if count> 5*FPS: #happens one time each second
@@ -90,94 +92,57 @@ def bisturi_robot_controll_loop(athomeBool,joystick_queue, shared_camera_pos, in
 				bisturi_robot.manual_start_midle() """
 
 			count+=1
-			#do_obstacle_avoidance(bisturi_robot, shared_camera_pos, bisturi_pose = bisturi_robot.get_last_pos() , calibration_matrix = info_computer_share['calibration_matrix']), 
-			bisturi_robot.iterate(axes,buttons)
+		
+			if not athomeBool:
+				colision = do_obstacle_avoidance(bisturi_pose = bisturi_robot.get_last_pos(), camera_pose=shared_camera_pos, L=L, info_computer_share=info_computer_share)
+			if not colision:
+				bisturi_robot.iterate(axes,buttons)
+			else:
+				joystick_queue.put(axes + buttons + [quit]+[True])
+
 			clock.tick(FPS)
 	
 	except KeyboardInterrupt:
-		joystick_queue.put(axes + buttons + [True])
+		joystick_queue.put(axes + buttons + [True]+[False])
 		pass
 	finally:
 		pygame.quit()
 		bisturi_robot.housekeeping() #this ends the manual mode and closes the serial port
 
 
-# def computer_comunication_loop(info_computer_share):
-# 	FPS=10
-# 	client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-# 	client.connect(('194.210.177.59', 50000))
-# 	clock = pygame.time.Clock()
-# 	last_state = info_computer_share['state']
-# 	last_bisturi_pos=info_computer_share['last_bisturi_pos']
-# 	last_cutting_plan = info_computer_share['cutting_plan']
-# 	k=True
-# 	while k:
-# 			data = client.recv(1024)
-# 			if not data:
-# 				k=False
-
-# 			elif data.decode()!='':#something was received
-# 				received = data.decode().split('\n')
-# 				#update info_computer_share parameters - like calibration matrix
-
-# 			else:#send data
-# 				message=''
-# 				if last_state != info_computer_share['state']:
-# 					last_state = info_computer_share['state']
-# 					message +=f'New State: {last_state}\n'
-
-# 				if last_bisturi_pos !=info_computer_share['last_bisturi_pos']:
-# 					last_bisturi_pos=info_computer_share['last_bisturi_pos']
-# 					message +=f'Bisturi Pose: {last_bisturi_pos}\n'
-
-# 				if 	last_cutting_plan != info_computer_share['cutting_plan']:
-# 					last_cutting_plan = info_computer_share['cutting_plan']
-# 					message +=f'Cutting Plan: {last_cutting_plan}\n'
-				
-				
-
-# 				len_mssg=len(message)
-# 				if len_mssg:
-# 					message+=f'{len_mssg}\n'#length of carachters to make sure the other computer has received the correct info
-
-# 				client.send(message.encode('utf-8'))
-
-# 				while True:#loop to check if the other computer received all the info. If it did not, resend information
-# 					check_received = client.recv(1024)
-# 					if bool(check_received.decode()):
-# 						break
-# 					else:
-# 						client.send(message.encode('utf-8'))
 
 
-# 			clock.tick(FPS)
-
-def send_robot_data(info_computer_share):
+def send_robot_data(FPS,info_computer_share):
 	FPS = 1
-	HEADER, FORMAT, DISCONNECT_MESSAGE, ADDR = define_constants()
-	connect_to_server(ADDR, HEADER, FORMAT, DISCONNECT_MESSAGE,FPS, info_computer_share)
-
+	#HEADER, FORMAT, DISCONNECT_MESSAGE, ADDR = define_constants()
+	#connect_to_server(ADDR, HEADER, FORMAT, DISCONNECT_MESSAGE,FPS, info_computer_share)
+	while info_computer_share['state'] != 4:
+		print('info_computer_share', str(info_computer_share))
+		time.sleep(1)
 def main():
+	FPS=40
+	L= 1000 #distance between base of the 2 robots
 	athomeBool=True
 	joystick_queue = queue.LifoQueue() #this queue will save values for the joystick's current state - it will be shared between the loops for both robots
 	shared_camera_pos =[0,0,0,0,0]
-	info_computer_share = {'state': -1, 'last_bisturi_pos': [0,0,0,0,0], 'calibration_matrix': None, 'cutting_plan':[0,0]}
-							#state: -1 if in no state
-							#		0 if in calibration
-							#		1 if in running
-							#		2 if preparing for cut
-							#		3 doing cut
-							#		4 finished running
-	robot_bisturi_thread = threading.Thread(target=bisturi_robot_controll_loop, args=(athomeBool, joystick_queue, shared_camera_pos, info_computer_share))
-	robot_camera_thread = threading.Thread(target=camera_robot_loop, args=(athomeBool, joystick_queue, shared_camera_pos))
-	#send_data_thread = threading.Thread(target=send_robot_data,args=(info_computer_share))
+	info_computer_share = {'state': -1, 'last_bisturi_pos': [0,0,0,0,0],  'cutting_plan':[0,0],'coliding':False}
+							#state: -1 - Initializing
+							#		0 - Running joints mode
+							#		1 - Running xyz mode
+							#		2 - Preparing for cut
+							#		3 - Cutting
+							#		4 - Finished running
+	robot_bisturi_thread = threading.Thread(target=bisturi_robot_controll_loop, args=(FPS,L, athomeBool, joystick_queue, shared_camera_pos, info_computer_share))
+	robot_camera_thread = threading.Thread(target=camera_robot_loop, args=(FPS,athomeBool, joystick_queue, shared_camera_pos))
+	send_data_thread = threading.Thread(target=send_robot_data,args=(FPS,info_computer_share))
 	
 	robot_bisturi_thread.start()
 	robot_camera_thread.start()
-	#computer_comunication_thread.start()
+	send_data_thread.start()
 	
 	robot_bisturi_thread.join() #this ensures that the main function only stops when the joystick loop thread is done running. This function should only end after the housekeeping of the robots
 	robot_camera_thread.join()
+	send_data_thread.join()
 
 if __name__ == "__main__":
     main()

@@ -102,7 +102,7 @@ def clean_buffer(ser):
 
 
 class Robot():
-	def __init__(self, joystick,FPS,info_computer_share=None,atHome=False, comPort='COM4', speedHigh=16, speedLow=10):
+	def __init__(self, joystick,info_computer_share=None,atHome=False, comPort='COM4', speedHigh=16, speedLow=10):
 		#initialization of the robot class
 		#this function opens the serial connection between the robot and the computer, defined the robot's speed % and calibrates the robot
 		if not atHome:
@@ -116,15 +116,12 @@ class Robot():
 
 
 		self.define_initial_variables(info_computer_share,speedLow,speedHigh,joystick)
-		self.info_computer_share['state'] = 0 #in calibration
-		self.manual_mode ='X'
-
-		#self.go_to_initial_position()
+		self.manual_mode ='J'
+		self.go_to_initial_position()
 		self.calculate_pos()
 		self.update_bisturi_pos_shared()
 		time.sleep(0.7)
 		self.initial_manual_start(type=self.manual_mode)
-		self.info_computer_share['state'] = 1 #robot is running
 		print('Bisturi Ready')
 
 		""" while True:
@@ -169,10 +166,7 @@ class Robot():
 		self.plan_to_cut_status =False
 		self.triangle_Pressed = False 
 		self.delta_cut=[0,0]
-		self.stop_program=False
-
-	def get_stop_program(self):
-		return self.stop_program
+	
 	
 	def get_serial(self):
 		return self.ser
@@ -214,6 +208,11 @@ class Robot():
 		self.serial_write(b'~ \r')
 		self.serial_write(b's \r')
 		self.serial_write(f'{speed} \r'.encode('utf-8'))
+		if type=='J':
+			self.info_computer_share['state'] = 0 #robot is running in joints mode
+		else:
+			self.info_computer_share['state'] = 1 #robot is running in xyz mode
+			
 		time.sleep(0.4)
 		self.serial_write(f'{type} \r'.encode('utf-8'))
 		time.sleep(0.2)
@@ -250,7 +249,6 @@ class Robot():
 
 				self.previousHighSpeed = True
 				self.joystick.rumble(0.1, 1, 100)
-				self.info_computer_share['Speed']='Speed High'
 				print('High speed')
 
 
@@ -263,7 +261,6 @@ class Robot():
 
 				self.previousHighSpeed = False
 				self.joystick.rumble(1, 0.2, 100)
-				self.info_computer_share['Speed']='Speed Low'
 				print('Low speed')
 
 			self.x_Pressed=True
@@ -301,7 +298,7 @@ class Robot():
 			self.f.write(string)
 			self.joystick.rumble(0.4, 0.4, 200)
 			self.manual_start_midle()
-			self.tara_position=self.pos
+			self.tara_position=self.pos.copy()
 			self.update_bisturi_pos_shared()
 			self.circle_Pressed=True  
 			self.message= {'Q':0, '1':0,  'W':0,'2':0, 'E':0,'3':0,  'R':0,'4':0, 'T':0,'5':0,}
@@ -323,7 +320,12 @@ class Robot():
 				self.plan_to_cut_status =False
 				self.delta_cut =[0,0]
 				self.joystick.rumble(0.8, 0.8, 100)
-				self.info_computer_share['state'] = 1 #robot is running normally
+				#robot is running normally
+				if self.manual_mode == 'X':
+					self.info_computer_share['state'] = 1 #xyz mode
+				else:
+					self.info_computer_share['state'] = 0  #joints mode
+					
 				self.manual_start_midle()
 
 			else:
@@ -411,7 +413,12 @@ class Robot():
 			self.joystick.rumble(0.3, 0.3, 10)#rumble while waiting for cut
 			self.perform_cut()
 			self.plan_to_cut_status =False
-			self.info_computer_share['state'] = 1 #robot is running normally
+			self.delta_cut =[0,0]
+			self.info_computer_share['cutting_plan']=[0,0]
+			if self.manual_mode == 'X':
+				self.info_computer_share['state'] = 1 #xyz mode
+			else:
+				self.info_computer_share['state'] = 0  #joints mode
 			self.manual_start_midle()
 			return
 		
@@ -520,7 +527,7 @@ class Robot():
 					self.joints[i]+=J_sensitivity*deltas[i]
 			
 
-			self.pos =foward_kinematics(self.joints)
+			#self.pos =foward_kinematics(self.joints, 'bisturi') LEFT TO IMPLEMENT FULLY...
 
 
 	
@@ -675,7 +682,6 @@ class cameraRobot():
 			self.serial_write(b'Q \r')
 			message['Q']+=1
 		self.predict_next_pos(message)
-		self.pos = foward_kinematics(self.joints)
 		self.shared_camera_pos=self.pos
 
 
@@ -688,7 +694,7 @@ class cameraRobot():
 		self.joints[0]+=deltas[0]*base_sensitivity#base
 		self.joints[3]+=deltas[1]*pitch_sensitivity#pitch
 
-		self.pos =foward_kinematics(self.joints)
+		#self.pos =foward_kinematics(self.joints,'camera') LEFT TO IMPLEMENT FULLY
 			
 
 	def set_position(self, position_values):

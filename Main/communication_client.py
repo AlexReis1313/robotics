@@ -19,8 +19,10 @@ def connect_to_server(ADDR, HEADER, FORMAT, DISCONNECT_MESSAGE,FPS, info_compute
     clock = Clock()
     communicating = True
     cont = 0
+    last_shared_info = {'state': -1, 'last_bisturi_pos': [0,0,0,0,0],  'cutting_plan':[0,0],'coliding':False}
+
     while communicating:
-        data = current_state(info_computer_share)
+        data, last_shared_info = current_state(clock,info_computer_share, last_shared_info)
         information_exchange(data, FORMAT, HEADER, client,cont)
         cont +=1
         clock.tick(FPS)
@@ -40,14 +42,14 @@ def information_exchange(data, FORMAT, HEADER, client,cont):
     client.send(send_length)
     client.send(data_s)
 
-    #Receive Information
+    """ #Receive Information
     if cont <1:
         data_r_length = client.recv(HEADER).decode(FORMAT) #Receives size of message from client
         if data_r_length: #See if is a valid message
             data_r_length = int(data_r_length)
             data_r = client.recv(data_r_length).decode(FORMAT)
             print(f'[CALIBRATION MATRIX] {ast.literal_eval(data_r)}') #transforms string to whatever without parsing problems
-
+ """
 """ def current_state(time): #placeholder using time
 
     if time < 5:
@@ -57,9 +59,8 @@ def information_exchange(data, FORMAT, HEADER, client,cont):
     else: 
         return (4, [1,4,0,0,0], True, [0,0,39]) """
 
-def current_state(info_computer_share, last_shared_info): 
+def current_state(clock,info_computer_share, last_shared_info): 
     k=True
-    
     while k: #only leaves this loop when a new state is found
         if last_shared_info['state'] != info_computer_share['state']:
             last_shared_info['state'] = info_computer_share['state']
@@ -72,9 +73,15 @@ def current_state(info_computer_share, last_shared_info):
         if 	last_shared_info['cutting_plan'] != info_computer_share['cutting_plan']:
             last_shared_info['cutting_plan'] = info_computer_share['cutting_plan']
             k=False	
-    
 
-    return tuple((last_shared_info['state'],last_shared_info['last_bisturi_pos'],True ,last_shared_info['cutting_plan']))
+        if 	last_shared_info['coliding'] != info_computer_share['coliding']:
+            last_shared_info['coliding'] = info_computer_share['coliding']
+            k=False	
+
+        if k:
+            clock.tick(20)
+    data = tuple((last_shared_info['state'],last_shared_info['last_bisturi_pos'],last_shared_info['cutting_plan'], last_shared_info['coliding']))
+    return data, last_shared_info
     
 
 """ def main():
