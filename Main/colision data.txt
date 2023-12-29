@@ -1,7 +1,15 @@
-cam:[0, 0, 0, 0, 0]   bisturi:[0, 0, 0, 0, 0]   Not coliding
-cam:[0, 0, 0, 0, 0]   bisturi:[0, 0, 0, 0, 0]   Not coliding
-cam:[0, 0, 0, 0, 0]   bisturi:[0, 0, 0, 0, 0]   Coliding
-cam:[0, 0, 0, 0, 0]   bisturi:[0, 0, 0, 0, 0]   Coliding
-cam:[0, 0, 0, 0, 0]   bisturi:[0, 0, 0, 0, 0]   Coliding
-cam:[0, 0, 0, 0, 0]   bisturi:[0, 0, 0, 0, 0]   Not coliding
-cam:[0, 0, 0, 0, 0]   bisturi:[0, 0, 0, 0, 0]   Coliding
+cam:[7479, -264, 2551, 165, -177]   bisturi:[5937, 429, 1629, -460, -201]   Coliding
+cam:[7219, -267, 5538, 391, -177]   bisturi:[5851, 418, 1380, -486, -201]   Not coliding
+cam:[7144, -268, 6381, 352, -177]   bisturi:[5558, -1877, 1380, -486, -201]   Not coliding
+cam:[7144, -268, 6382, 352, -177]   bisturi:[]   Not coliding
+cam:[7144, -268, 6381, 352, -177]   bisturi:[6268, 202, 4722, -146, -201]   Coliding
+cam:[7144, -268, 6382, 352, -177]   bisturi:[]   Coliding
+cam:[7144, -268, 6381, 352, -177]   bisturi:[4683, 345, 3327, -354, -201]   Not coliding
+cam:[7149, -16, 6381, 352, -177]   bisturi:[]   Not coliding
+cam:[7149, -16, 6381, 352, -177]   bisturi:[5611, 339, 1014, -535, -201]   Not coliding
+cam:[7713, 11, 3575, 123, -177]   bisturi:[5812, 215, -53, -565, -201]   Not coliding
+cam:[7575, 4, 2704, 114, -177]   bisturi:[5812, 215, -53, -565, -201]   Not coliding
+cam:[7575, 5, 2703, 113, -177]   bisturi:[6461, 278, 1157, -443, -201]   Coliding
+cam:[7575, 5, 2703, 114, -177]   bisturi:[6730, 304, 1410, -400, -201]   Coliding
+cam:[7575, 4, 2703, 114, -177]   bisturi:[7441, -804, 2488, -253, -201]   Coliding
+cam:[7575, 4, 2704, 114, -177]   bisturi:[7612, -454, 2189, -252, -201]   Coliding
