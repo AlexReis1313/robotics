@@ -40,7 +40,7 @@ def do_obstacle_avoidance(bisturi_pose, camera_pose, L, info_computer_share):
 
 def camera_robot_loop(FPS, athomeBool,joystick_queue, shared_camera_pos):
 	clock = pygame.time.Clock()
-	camera_robot = cameraRobot(shared_camera_pos, comPort='COM4', atHome=True)
+	camera_robot = cameraRobot(shared_camera_pos, comPort='COM4', atHome=athomeBool)
 	axes=[0]*4+[-1,-1]
 	buttons=[0]*15
 	coliding=False
@@ -70,7 +70,7 @@ def camera_robot_loop(FPS, athomeBool,joystick_queue, shared_camera_pos):
 def bisturi_robot_controll_loop( FPS, L, athomeBool,joystick_queue, shared_camera_pos, info_computer_share):
 	joystick = initialize_joystick()
 	clock = pygame.time.Clock()
-	bisturi_robot=Robot(joystick, info_computer_share ,comPort='COM4', atHome=False)
+	bisturi_robot=Robot(joystick, info_computer_share ,comPort='COM4', atHome=athomeBool)
 	count=0
 	colision =False
 	try:
@@ -85,22 +85,22 @@ def bisturi_robot_controll_loop( FPS, L, athomeBool,joystick_queue, shared_camer
 				joystick_queue.put(axes + buttons + [True]+[False])
 				info_computer_share['state']=4
 				return
-			""" if count> 5*FPS: #happens one time each second
-				count=0
-				bisturi_robot.manual_end()
-				bisturi_robot.calculate_pos()
-				bisturi_robot.update_bisturi_pos_shared()
-				bisturi_robot.manual_start_midle() """
+			if bisturi_robot.getcount()> 7*FPS: #happens if more than 7 seconds have passed since last time a LISTPV was done
+				null_axes=[0,0,0,0,-1,-1]
+				check_axes=[abs(axes[i]-null_axes[i]) for i in range(len(axes))]
+				if max(check_axes)<0.2 and buttons[9]==0 and buttons[10]==0 : #if no button is being pressed, get position of robot
+					
+					bisturi_robot.manual_end()
+					bisturi_robot.calculate_pos() #this returns count to zero
+					bisturi_robot.update_bisturi_pos_shared()
+					bisturi_robot.manual_start_midle()
 
-			count+=1
-		
 			if not athomeBool:
 				colision = do_obstacle_avoidance(bisturi_pose = bisturi_robot.get_last_pos(), camera_pose=shared_camera_pos, L=L, info_computer_share=info_computer_share)
 			if not colision:
 				bisturi_robot.iterate(axes,buttons)
 			else:
 				joystick_queue.put(axes + buttons + [quit]+[True])
-
 			clock.tick(FPS)
 	
 	except KeyboardInterrupt:

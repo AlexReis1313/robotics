@@ -112,7 +112,6 @@ class Robot():
 			self.ser=False
 		
 		self.message= {'Q':0, '1':0,  'W':0,'2':0, 'E':0,'3':0,  'R':0,'4':0, 'T':0,'5':0,}
-		self.f=open('Data_aquisition_29_12_Joints.txt','a')
 
 
 		self.define_initial_variables(info_computer_share,speedLow,speedHigh,joystick)
@@ -161,7 +160,8 @@ class Robot():
 		self.plan_to_cut_status =False
 		self.triangle_Pressed = False 
 		self.delta_cut=[0,0]
-	
+		self.count=0
+
 	
 	def get_serial(self):
 		return self.ser
@@ -239,10 +239,11 @@ class Robot():
 			if self.manual_mode == 'X': #robot was previously with low speed - and will now have high speed
 				self.manual_end()
 				time.sleep(0.1)
+				self.calculate_pos()
+				time.sleep(0.1)
 				self.speed=self.speedHigh
 				self.manual_mode = 'J'
 				self.initial_manual_start(type = self.manual_mode)
-
 				self.previousHighSpeed = True
 				self.joystick.rumble(0.1, 1, 100)
 				print('High speed')
@@ -251,10 +252,11 @@ class Robot():
 			else: #robot was previously with high speed and will now have low speed
 				self.manual_end()
 				time.sleep(0.1)
+				self.calculate_pos()
+				time.sleep(0.1)
 				self.speed=self.speedLow
 				self.manual_mode = 'X'
 				self.initial_manual_start(type = self.manual_mode)
-
 				self.previousHighSpeed = False
 				self.joystick.rumble(1, 0.2, 100)
 				print('Low speed')
@@ -275,37 +277,25 @@ class Robot():
 		elif not self.circle_Pressed and circleButton:  #circle was not pressed and now is pressed - send information of current pos
 			self.manual_end()
 			time.sleep(0.15)
-			
-
-			old_pos=self.pos.copy()
-			old_joints=self.joints.copy()
-
-
-
-			#print('message', self.message)
 			self.calculate_pos()
-			#delta_pose=[old_pos[i]-self.pos[i] for i in range(len(self.pos))]
-			#print('Difference between estimation and pose', delta_pose)
-			#print()
-
-			if self.manual_mode=='X':
-				delta_tara_pos=[-self.tara_position[i]+self.pos[i] for i in range(len(self.pos))]
-				
-				string=f'message:{self.message}  delta:{delta_tara_pos}   XYZ\n'
-			else:
-				
-				
-				delta_joints = [-self.joints_last[i]+self.joints[i] for i in range(len(self.joints))]
-				string=f'message:{self.message}  delta:{delta_joints}   JOINTS\n'
-
-			self.f.write(string)
 			self.joystick.rumble(0.4, 0.4, 200)
 			self.manual_start_midle()
 			self.tara_position=self.pos.copy()
 			self.update_bisturi_pos_shared()
 			self.circle_Pressed=True  
-			self.message= {'Q':0, '1':0,  'W':0,'2':0, 'E':0,'3':0,  'R':0,'4':0, 'T':0,'5':0,}
-			self.joints_last=self.joints.copy()
+
+			#thi is used to gather data
+			""" if self.manual_mode=='X':
+				delta_tara_pos=[-self.tara_position[i]+self.pos[i] for i in range(len(self.pos))]
+				string=f'message:{self.message}  delta:{delta_tara_pos}   XYZ\n'
+			else:
+				
+				delta_joints = [-self.joints_last[i]+self.joints[i] for i in range(len(self.joints))]
+				string=f'message:{self.message}  delta:{delta_joints}   JOINTS\n'
+
+			self.f.write(string) 
+			self.joints_last=self.joints.copy()"""
+
 			
                             
 
@@ -328,8 +318,7 @@ class Robot():
 				if self.manual_mode == 'X':
 					self.info_computer_share['state'] = 1 #xyz mode
 				else:
-					self.info_computer_share['state'] = 0  #joints mode
-					
+					self.info_computer_share['state'] = 0  #joints mode	
 				self.manual_start_midle()
 
 			else:
@@ -348,14 +337,12 @@ class Robot():
 		print('deltasxyz',deltasXYZRP)
 		for i, delta in enumerate(deltasXYZRP):
 			if delta!=0:
-				
 				self.serial_write(f'SETPVC {prefix}[{ptNumber}] {cartesian[i]} {self.pos[i]+delta}\r'.encode('utf-8'))
 				time.sleep(0.4)
 
 
 	def set_path(self,prefix ):
-		self.delta_cut=[500,-300]#x,z
-		
+		#recomendade values: self.delta_cut=[500,-300]#x,z
 		#POINT 1 - here
 		deltasXYZRP=[0]*5
 		self.set_point(prefix, 1, deltasXYZRP)
@@ -388,7 +375,6 @@ class Robot():
 
 	def perform_cut(self):
 		print('Preparing to cut')
-		path_comands = []
 		prefix='AA'
 		nrpoints=7
 		#creating an array of points
@@ -441,7 +427,6 @@ class Robot():
 			show=True """			
 
 		if show:
-			print('Delta to cut ',self.delta_cut)
 			self.info_computer_share['cutting_plan'] = [round(self.delta_cut[i]/10,1) for i in range(len(self.delta_cut))]
 
 	def iterate(self,axes,buttons ):
@@ -449,6 +434,7 @@ class Robot():
 		if self.plan_to_cut_status:
 			self.plan_to_cut(axes, buttons)
 		else:
+			self.count+=1
 			self.tara(buttons[1]) #tara/zero the position shown on screen
 			_ = self.update_speed(buttons[0]) #change speed if x is pressed
 			self.manual_move(axes, buttons)
@@ -456,61 +442,58 @@ class Robot():
 
 
 	def manual_move(self, axes,buttons ):
-		message= {'Q':0, '1':0,  'W':0,'2':0, 'E':0,'3':0,  'R':0,'4':0, 'T':0,'5':0,}
 
 		if axes[1] < -0.2:
 			self.serial_write(b'1 \r')
-			message['1']+=1
+			self.message['1']+=1
 
 		elif axes[1] > 0.2:
 			self.serial_write(b'Q \r')
-			message['Q']+=1
+			self.message['Q']+=1
 
 		if axes[0] < -0.2:
 			self.serial_write(b'2 \r')
-			message['2']+=1
+			self.message['2']+=1
 
 		elif axes[0] > 0.2:
 			self.serial_write(b'W \r')
-			message['W']+=1
+			self.message['W']+=1
 
 		if axes[2] < -0.2:
 			self.serial_write(b'4 \r')
-			message['4']+=1
+			self.message['4']+=1
 
 		elif axes[2] > 0.2:
 			self.serial_write(b'R \r')
-			message['R']+=1
+			self.message['R']+=1
 
 		if axes[3] < -0.2:
 			self.serial_write(b'T \r')
-			message['T']+=1
+			self.message['T']+=1
 
 		elif axes[3] > 0.2:
 			self.serial_write(b'5 \r')
-			message['5']+=1
+			self.message['5']+=1
 		
 		if buttons[9] ==1:
 			self.serial_write(b'3 \r')
-			message['3']+=1
+			self.message['3']+=1
 		
 		elif buttons[10] ==1:
 			self.serial_write(b'E \r') 
-			message['E']+=1
+			self.message['E']+=1
 		
-		for i in message:
-			self.message[i]+=message[i]
-		
-		self.predict_next_pos(message)#update the self.pos info with an estimation, based on the input of manual movement
+				
+		self.predict_next_pos()#update the self.pos info with an estimation, based on the input of manual movement
 		self.update_bisturi_pos_shared()
 
-	def predict_next_pos(self, message):
+	def predict_next_pos(self):
 		deltas=[]
-		deltas.append(message['Q']-message['1'])
-		deltas.append(message['W']-message['2'])
-		deltas.append(message['E']-message['3'])
-		deltas.append(message['R']-message['4'])
-		deltas.append(message['T']-message['5'])
+		deltas.append(self.message['Q']-self.message['1'])
+		deltas.append(self.message['W']-self.message['2'])
+		deltas.append(self.message['E']-self.message['3'])
+		deltas.append(self.message['R']-self.message['4'])
+		deltas.append(self.message['T']-self.message['5'])
 
 		if self.manual_mode =='X':
 			XYZ_sensitivity =[-4.725378787878788,
@@ -518,24 +501,22 @@ class Robot():
 							-4.646980255516841,
 							-0.49864498644986455,
 							3.0248419150858177] #from data
+			
+
 			for i in range(len(self.pos)):
-				self.pos[i]+=deltas[i]*XYZ_sensitivity[i]
+				self.pos[i]=self.TruePose[i] + deltas[i]*XYZ_sensitivity[i]
 
 		elif self.manual_mode =='J':
 			J_sensitivity = 35.79*self.speedHigh/self.speedLow #from data
 			pitch_sensitivity=69.275*self.speedHigh/self.speedLow #from data
 			for i in range(len(self.joints)):
 				if i ==3:
-					self.joints[i]+=pitch_sensitivity*deltas[i]
+					self.joints[i]=self.TrueJoints[i] + pitch_sensitivity*deltas[i]
 				else:
-					self.joints[i]+=J_sensitivity*deltas[i]
+					self.joints[i]=self.TrueJoints[i] + J_sensitivity*deltas[i]
 			
 
 			#self.pos =foward_kinematics(self.joints, 'bisturi') LEFT TO IMPLEMENT FULLY...
-
-
-	
-	
 
 	def update_bisturi_pos_shared(self):
 		self.info_computer_share['last_bisturi_pos']=[round(self.pos[i]-self.tara_position[i],0) for i in range(len(self.pos))]
@@ -561,10 +542,17 @@ class Robot():
 				result_list.append(int(value))
 			self.joints = result_list[0:5]
 			self.pos = result_list[5:10] 
+			
 		else:
 			self.pos = [0,0,0,0,0] 
 			self.joints=[0,0,0,0,0] 
+		self.message= {'Q':0, '1':0,  'W':0,'2':0, 'E':0,'3':0,  'R':0,'4':0, 'T':0,'5':0}
+		self.TruePose=self.pos.copy()
+		self.TrueJoints=self.joints.copy()
+		self.count=0
 
+	def getcount(self):
+		return self.count
 
 	def get_last_pos(self):
 		#function to get axis position values
@@ -582,7 +570,6 @@ class Robot():
 		if self.ser!=False: #if not atHome
 			self.ser.close()
 		print('housekeeping completed - exiting')	
-		self.f.close()
 
 	def serial_write(self, toWrite):
 		if self.ser!=False: #if not atHome
@@ -601,34 +588,29 @@ class cameraRobot():
 		self.speed=robotSpeed
 		self.shared_camera_pos = shared_camera_pos
 		self.square_pressed=False 
-
 		time.sleep(2)
 		self.serial_write(b'\r')
 		time.sleep(0.2)
-		#self.go_to_initial_position()
+		self.go_to_initial_position()
 		self.calculate_pos()
-
 		self.serial_write(f'SPEED {robotSpeed}\r'.encode('utf-8'))
 		time.sleep(0.5)
-		#self.initial_manual_start()
+		self.initial_manual_start()
 		print('Camera ready')
 
 	def go_to_initial_position(self):
 		joints=['1','2', '3', '4', '5']
-		initial_pos=[-303,-15473,-16732,-24732,47] #defined experimentally
-		
-		
+		initial_joints=[-303,-15473,-16732,-24732,47] #defined experimentally	
 		self.serial_write(b'DEFP A \r')
 		time.sleep(0.2)
 		self.serial_write(b'HERE A \r')
 		time.sleep(0.4)
-		for i, coordenate in  enumerate(initial_pos):	
+		for i, coordenate in  enumerate(initial_joints):	
 			printToRobot=f'SETPV A {joints[i]} {int(coordenate)}\r'
 			self.serial_write(printToRobot.encode('utf-8'))
 			time.sleep(0.2)
-		self.serial_write(b'MOVE A 700\r')
-		time.sleep(8)
-
+		self.serial_write(b'MOVE A 600\r')
+		time.sleep(6)
 
 	def move(self, axes,buttons ):
 		self.update_pos(buttons[2])
@@ -664,7 +646,6 @@ class cameraRobot():
 		if not square_button: #square is not pressed
 			self.square_pressed=False 
 			return
-
 		if self.square_pressed and square_button: #square was pressed and still is - no changes
 			return None
 		elif not self.square_pressed and square_button:  #square was not pressed and now is pressed - get current position of robot
@@ -677,8 +658,6 @@ class cameraRobot():
 			self.serial_write(b'con \r')
 			time.sleep(0.2)
 		
-
-
 	def manual_move(self,axes, buttons):
 		message= {'Q':0, '1':0,  'R':0,'4':0}
 		#pitch:
@@ -695,32 +674,36 @@ class cameraRobot():
 		elif buttons[4] - buttons[6] >0:
 			self.serial_write(b'Q \r')
 			message['Q']+=1
-		self.predict_next_pos(message)
+		
+		for i in message:
+			self.message[i]+=message[i]
+		if max([self.message['1'],self.message['Q']]): #if there was movement on the base
+			if not max([message['1'],message['Q']]): #and there was no movement of the base in this iteration
+				self.calculate_pos()
+		self.predict_next_pos()
 		self.shared_camera_pos=self.pos
 
 
-	def predict_next_pos(self, message):
+	def predict_next_pos(self, ):
 		deltas=[]
-		deltas.append(message['Q']-message['1'])
-		deltas.append(message['R']-message['4'])
+		deltas.append(self.message['Q']-self.message['1'])
+		deltas.append(self.message['R']-self.message['4'])
 		base_sensitivity = 35.79 #from data
 		pitch_sensitivity=69.275 #from data
-		self.joints[0]+=deltas[0]*base_sensitivity#base
-		self.joints[3]+=deltas[1]*pitch_sensitivity#pitch
+		self.joints[0]= self.Truejoints[0] + deltas[0]*base_sensitivity#base
+		self.joints[3]= self.Truejoints[3] + deltas[1]*pitch_sensitivity#pitch
 
 		#self.pos =foward_kinematics(self.joints,'camera') LEFT TO IMPLEMENT FULLY
 			
 
 	def set_position(self, position_values):
-		
 		cartesian=['X','Y', 'Z', 'P', 'R']
-
 		for i,coordenate in enumerate(position_values) :
 			if self.pos[i] != position_values[i]:
 				#printToRobot=f'SHIFT AA BY {i+1} {int(delta)} \r'
 				printToRobot=f'SETPVC A {cartesian[i]} {int(coordenate)}\r'
 				self.serial_write(printToRobot.encode('utf-8'))
-				time.sleep(0.5)
+				time.sleep(0.3)
 
 
 	def initial_manual_start(self):
@@ -739,15 +722,13 @@ class cameraRobot():
 		self.serial_write(f'{self.speed} \r'.encode('utf-8'))
 		#time.sleep(0.05)
 
-
 	def manual_end(self):
 		self.serial_write(b'\r')
 		#clean_buffer(serial)
 		self.serial_write(b'~\r')
 		time.sleep(0.05)
 		self.serial_write(b'\r')
-
-		
+	
 	def go_home(self):
 		self.serial_write(b'home\r')
 		time.sleep(180) # homing takes a few minutes ...
@@ -771,7 +752,10 @@ class cameraRobot():
 		else:
 			self.pos =[0,0,0,0,0]
 			self.joints=[0,0,0,0,0]
-		self.shared_camera_pos = self.pos
+		self.message= {'Q':0, '1':0,  'R':0,'4':0}
+		self.TruePose=self.pos.copy()
+		self.Truejoints=self.joints.copy()
+		self.shared_camera_pos = self.pos.copy()
 
 	def get_pos(self):
 		#function to get axis position values
@@ -788,7 +772,6 @@ class cameraRobot():
 			self.ser.write(toWrite)
 		print('camera',toWrite)
 	
-
 	def housekeeping(self):
 		self.manual_end()
 		time.sleep(0.5)
