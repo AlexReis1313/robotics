@@ -10,7 +10,7 @@ def main_graphycs(info_computer_share):
     camera_image = cv2.imread('images/camera.png', cv2.IMREAD_UNCHANGED)
 
     # List of images corresponding to states
-    state_images = [image1, image2, image3]
+    state_images = [image1, image2, image3,image3, image1]
 
     # Open a connection to the webcam (0 is usually the default camera), for the robot webcam, change to 1
     cap = cv2.VideoCapture(0)
@@ -21,7 +21,7 @@ def main_graphycs(info_computer_share):
     # Record the start time of the program
     start_time = time.time()
 
-    while True:
+    while info_computer_share['state']!=4:
         # Read a frame from the webcam
         ret, frame = cap.read()
 
