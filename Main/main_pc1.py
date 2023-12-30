@@ -43,6 +43,7 @@ def camera_robot_loop(FPS, athomeBool,joystick_queue, shared_camera_pos):
 	camera_robot = cameraRobot(shared_camera_pos, comPort='COM4', atHome=True)
 	axes=[0]*4+[-1,-1]
 	buttons=[0]*15
+	coliding=False
 	try:
 		while True:
 		# Handle events
@@ -69,7 +70,7 @@ def camera_robot_loop(FPS, athomeBool,joystick_queue, shared_camera_pos):
 def bisturi_robot_controll_loop( FPS, L, athomeBool,joystick_queue, shared_camera_pos, info_computer_share):
 	joystick = initialize_joystick()
 	clock = pygame.time.Clock()
-	bisturi_robot=Robot(joystick, info_computer_share ,comPort='COM4', atHome=True)
+	bisturi_robot=Robot(joystick, info_computer_share ,comPort='COM4', atHome=False)
 	count=0
 	colision =False
 	try:
@@ -112,13 +113,15 @@ def bisturi_robot_controll_loop( FPS, L, athomeBool,joystick_queue, shared_camer
 
 
 
-def send_robot_data(FPS,info_computer_share):
-	FPS = 5
-	HEADER, FORMAT, DISCONNECT_MESSAGE, ADDR = define_constants()
-	connect_to_server(ADDR, HEADER, FORMAT, DISCONNECT_MESSAGE,FPS, info_computer_share)
-	#while info_computer_share['state'] != 4:
-	#	print('info_computer_share', str(info_computer_share))
-	#	time.sleep(1)
+def send_robot_data(athome,info_computer_share):
+	if not athome:
+		FPS = 5
+		HEADER, FORMAT, DISCONNECT_MESSAGE, ADDR = define_constants()
+		connect_to_server(ADDR, HEADER, FORMAT, DISCONNECT_MESSAGE,FPS, info_computer_share)
+	else:
+		while info_computer_share['state'] != 4:
+			print('info_computer_share', str(info_computer_share))
+			time.sleep(1)
 def main():
 	FPS=40
 	L= 1000 #distance between base of the 2 robots
@@ -134,7 +137,7 @@ def main():
 							#		4 - Finished running
 	robot_bisturi_thread = threading.Thread(target=bisturi_robot_controll_loop, args=(FPS,L, athomeBool, joystick_queue, shared_camera_pos, info_computer_share))
 	robot_camera_thread = threading.Thread(target=camera_robot_loop, args=(FPS,athomeBool, joystick_queue, shared_camera_pos))
-	send_data_thread = threading.Thread(target=send_robot_data,args=(FPS,info_computer_share))
+	send_data_thread = threading.Thread(target=send_robot_data,args=(athomeBool,info_computer_share))
 	
 	robot_bisturi_thread.start()
 	robot_camera_thread.start()

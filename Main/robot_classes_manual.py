@@ -112,7 +112,7 @@ class Robot():
 			self.ser=False
 		
 		self.message= {'Q':0, '1':0,  'W':0,'2':0, 'E':0,'3':0,  'R':0,'4':0, 'T':0,'5':0,}
-		self.f=open('Data_aquisition_dias.txt','a')
+		self.f=open('Data_aquisition_29_12_Joints.txt','a')
 
 
 		self.define_initial_variables(info_computer_share,speedLow,speedHigh,joystick)
@@ -130,8 +130,12 @@ class Robot():
 	def go_to_initial_position(self):
 		cartesian=['X','Y', 'Z', 'P', 'R']
 		joints=['1','2', '3', '4', '5']
-		initial_joints=[-2015,-4879,-18666,-10462,-330]#defined experimentally
+		initial_joints=[1382,-4879,-18666,-10462,7823]#defined experimentally
+		
 		self.serial_write(b'DEFP A \r')
+		time.sleep(0.2)
+		self.serial_write(b'HERE A \r')
+		time.sleep(0.2)
 		for i, coordenate in  enumerate(initial_joints):	
 			printToRobot=f'SETPV A {joints[i]} {int(coordenate)}\r'
 			self.serial_write(printToRobot.encode('utf-8'))
@@ -214,13 +218,14 @@ class Robot():
 		self.serial_write(b'\r')
 		self.serial_write(b'~ \r')
 		
-		#time.sleep(0.05)
+		time.sleep(0.05)
 
 	def manual_end(self):
 		self.serial_write(b'\r')
 		#clean_buffer(serial)
-		self.serial_write(b'~\r')
 		time.sleep(0.05)
+		self.serial_write(b'~\r')
+		time.sleep(0.1)
 		self.serial_write(b'\r')
 
 	
@@ -277,13 +282,13 @@ class Robot():
 
 
 
-			print('message', self.message)
+			#print('message', self.message)
 			self.calculate_pos()
-			delta_pose=[old_pos[i]-self.pos[i] for i in range(len(self.pos))]
-			print('Difference between estimation and pose', delta_pose)
-			print()
+			#delta_pose=[old_pos[i]-self.pos[i] for i in range(len(self.pos))]
+			#print('Difference between estimation and pose', delta_pose)
+			#print()
 
-			""" if self.manual_mode=='X':
+			if self.manual_mode=='X':
 				delta_tara_pos=[-self.tara_position[i]+self.pos[i] for i in range(len(self.pos))]
 				
 				string=f'message:{self.message}  delta:{delta_tara_pos}   XYZ\n'
@@ -291,9 +296,8 @@ class Robot():
 				
 				
 				delta_joints = [-self.joints_last[i]+self.joints[i] for i in range(len(self.joints))]
-				string=f'message:{self.message}  delta:{delta_joints}   JOINTS\n' """
+				string=f'message:{self.message}  delta:{delta_joints}   JOINTS\n'
 
-			string=f'pos:{self.pos}   joints:{self.joints}\n'
 			self.f.write(string)
 			self.joystick.rumble(0.4, 0.4, 200)
 			self.manual_start_midle()
@@ -438,7 +442,7 @@ class Robot():
 
 		if show:
 			print('Delta to cut ',self.delta_cut)
-			self.info_computer_share['cutting_plan'] = [self.delta_cut[i]/10 for i in range(len(self.delta_cut))]
+			self.info_computer_share['cutting_plan'] = [round(self.delta_cut[i]/10,1) for i in range(len(self.delta_cut))]
 
 	def iterate(self,axes,buttons ):
 		self.evaluate_triangle(buttons[3]) #enter or exit plan to cut mode if triangle is pressed
@@ -454,19 +458,19 @@ class Robot():
 	def manual_move(self, axes,buttons ):
 		message= {'Q':0, '1':0,  'W':0,'2':0, 'E':0,'3':0,  'R':0,'4':0, 'T':0,'5':0,}
 
-		if axes[0] < -0.2:
-			self.serial_write(b'Q \r')
-			message['Q']+=1
-
-		elif axes[0] > 0.2:
+		if axes[1] < -0.2:
 			self.serial_write(b'1 \r')
 			message['1']+=1
 
-		if axes[1] < -0.2:
+		elif axes[1] > 0.2:
+			self.serial_write(b'Q \r')
+			message['Q']+=1
+
+		if axes[0] < -0.2:
 			self.serial_write(b'2 \r')
 			message['2']+=1
 
-		elif axes[1] > 0.2:
+		elif axes[0] > 0.2:
 			self.serial_write(b'W \r')
 			message['W']+=1
 
@@ -534,7 +538,7 @@ class Robot():
 	
 
 	def update_bisturi_pos_shared(self):
-		self.info_computer_share['last_bisturi_pos']=[self.pos[i]-self.tara_position[i] for i in range(len(self.pos))]
+		self.info_computer_share['last_bisturi_pos']=[round(self.pos[i]-self.tara_position[i],0) for i in range(len(self.pos))]
 
 
 	def go_home(self):
@@ -601,21 +605,25 @@ class cameraRobot():
 		time.sleep(2)
 		self.serial_write(b'\r')
 		time.sleep(0.2)
-		self.go_to_initial_position()
+		#self.go_to_initial_position()
 		self.calculate_pos()
 
 		self.serial_write(f'SPEED {robotSpeed}\r'.encode('utf-8'))
 		time.sleep(0.5)
-		self.initial_manual_start()
+		#self.initial_manual_start()
 		print('Camera ready')
 
 	def go_to_initial_position(self):
 		joints=['1','2', '3', '4', '5']
 		initial_pos=[-303,-15473,-16732,-24732,47] #defined experimentally
+		
+		
 		self.serial_write(b'DEFP A \r')
 		time.sleep(0.2)
+		self.serial_write(b'HERE A \r')
+		time.sleep(0.4)
 		for i, coordenate in  enumerate(initial_pos):	
-			printToRobot=f'SETPVC A {joints[i]} {int(coordenate)}\r'
+			printToRobot=f'SETPV A {joints[i]} {int(coordenate)}\r'
 			self.serial_write(printToRobot.encode('utf-8'))
 			time.sleep(0.2)
 		self.serial_write(b'MOVE A 700\r')
@@ -627,20 +635,23 @@ class cameraRobot():
 		if max(buttons[11:15]):
 			if not self.arrowsPressed: #if some arrow button has just been pressed
 				self.manual_end()
+				time.sleep(0.1)
+				self.calculate_pos()
+				time.sleep(0.2)
 				delta_z =0
 				delta_x=0
 				if buttons[11]-buttons[12]>0: #move up - arrow up pressed
-					delta_z=400
+					delta_z=500
 				elif buttons[11]-buttons[12]<0: #move down - arrow down pressed
-					delta_z=-400
+					delta_z=-500
 				if buttons[13]-buttons[14]>0: #move backward - arrow left pressed
-					delta_x=400
+					delta_x=300
 				elif buttons[13]-buttons[14]<0:#move foward - arrow right pressed
-					delta_x=-400
+					delta_x=-300
 				new_position = [self.pos[0]+delta_x, self.pos[1], self.pos[2]+delta_z, self.pos[3],self.pos[4] ]
 				self.set_position(new_position)
 				self.serial_write(b'Move A 200\r')
-				time.sleep(0.5)
+				time.sleep(2)
 				self.pos = new_position
 				self.shared_camera_pos = new_position   
 				self.arrowsPressed = True
@@ -659,9 +670,12 @@ class cameraRobot():
 		elif not self.square_pressed and square_button:  #square was not pressed and now is pressed - get current position of robot
 			self.manual_end()
 			self.calculate_pos()
+			time.sleep(0.2)
 			self.manual_start_midle()
 			self.square_pressed=True 
+			time.sleep(0.3)
 			self.serial_write(b'con \r')
+			time.sleep(0.2)
 		
 
 
