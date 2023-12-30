@@ -10,7 +10,7 @@ def main_graphycs(info_computer_share):
     camera_image = cv2.imread('images/camera.png', cv2.IMREAD_UNCHANGED)
 
     # List of images corresponding to states
-    state_images = [image1, image2, image3,image3, image1]
+    state_images = [image1, image2, image3, image3, image1]
 
     # Open a connection to the webcam (0 is usually the default camera), for the robot webcam, change to 1
     cap = cv2.VideoCapture(0)
@@ -50,6 +50,13 @@ def main_graphycs(info_computer_share):
             state_text = "Running in XYZ mode"
         elif state == 2:
             state_text = "Preparing for cut"
+            
+            # Display the values of depth and length of cut when in state 2
+            depth, length = info_computer_share['cutting_plan']
+            depth_length_text = f"Depth of Cut: {depth} mm   Length of Cut: {length} mm"
+            cv2.putText(combined_frame, depth_length_text, (10, 90),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2, cv2.LINE_AA)     
+            
         elif state == 3:
             state_text = "Cutting"
         elif state == 4:
