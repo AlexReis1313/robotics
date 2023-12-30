@@ -5,8 +5,7 @@ import pygame
 def define_constants():
     HEADER = 64 #Header before message that tells length of the message that comes next. Wont be needed for project
     PORT = 5050 
-    #SERVER = socket.gethostbyname(socket.gethostname()) #gets ip automatically, instead of previous line
-    SERVER = '194.210.158.147'
+    SERVER = socket.gethostbyname(socket.gethostname()) #gets ip automatically, instead of previous line
     ADDR = (SERVER, PORT)
     FORMAT = 'utf-8'
     DISCONNECT_MESSAGE = '!DISCONNECT'
