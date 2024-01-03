@@ -13,7 +13,7 @@ from robot_classes_manual import *
 from communication_client import *
 
 def do_obstacle_avoidance(bisturi_pose, camera_pose, L, info_computer_share):
-	safety_distance = 100
+	safety_distance = 200
 	
 	transformation_matrix = np.array([
 		[-1, 0, 0, L],
@@ -22,9 +22,9 @@ def do_obstacle_avoidance(bisturi_pose, camera_pose, L, info_computer_share):
 		[0, 0, 0, 1]
 	])
 
-	# don't exactly know how to get the positions, for now let's say the inputs are given
-	end_effector1_R1 = np.concatenate([bisturi_pose[:3], np.array([1])])
-	end_effector2_R2 = np.concatenate([camera_pose[:3], np.array([1])])
+	# take the first 3 elements of the position vector, convert to mm and add a 1 for homogeneous form
+	end_effector1_R1 = np.concatenate([np.array(bisturi_pose[:3]) / 10, np.array([1])])
+	end_effector2_R2 = np.concatenate([np.array(camera_pose[:3]) / 10, np.array([1])])
 	end_effector2_R1 = np.dot(transformation_matrix, end_effector2_R2)
 	
 	# Calculate the Euclidean distance between the two points
@@ -124,7 +124,7 @@ def send_robot_data(athome,info_computer_share):
 			time.sleep(1)
 def main():
 	FPS=40
-	L= 1000 #distance between base of the 2 robots
+	L= 1000 #distance between base of the 2 robots in mm
 	athomeBool=True
 	joystick_queue = queue.LifoQueue() #this queue will save values for the joystick's current state - it will be shared between the loops for both robots
 	shared_camera_pos =[0,0,0,0,0]
