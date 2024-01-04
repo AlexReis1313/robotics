@@ -5,6 +5,7 @@ import threading
 import queue
 import math
 import numpy as np
+import pickle
 
 from joystick_functions import*
 def foward_kinematics(joints,robot_type): #left to implement
@@ -110,10 +111,11 @@ class Robot():
 			print("COM port in use: {0}".format(self.ser.name))		
 		else:
 			self.ser=False
-		
+		time.sleep(80)
+		self.go_home()
 		self.message= {'Q':0, '1':0,  'W':0,'2':0, 'E':0,'3':0,  'R':0,'4':0, 'T':0,'5':0,}
 
-
+		self.initialize_pose_LinearRegressions()
 		self.define_initial_variables(info_computer_share,speedLow,speedHigh,joystick)
 		self.manual_mode ='J'
 		self.go_to_initial_position()
@@ -124,12 +126,26 @@ class Robot():
 		self.initial_manual_start(type=self.manual_mode)
 		print('Bisturi Ready')
 
+	def initialize_pose_LinearRegressions(self):
+		with open("Joints_models.pickle", "rb") as f:
+			while True:
+				try:
+					self.models_joints=pickle.load(f)
+				except EOFError:
+					break
+		""" with open("XYZ_models.pickle", "rb") as f:
+			while True:
+				try:
+					self.models_XYZ=pickle.load(f)
+				except EOFError:
+					break
+ 		"""
 		
 		
 	def go_to_initial_position(self):
 		cartesian=['X','Y', 'Z', 'P', 'R']
 		joints=['1','2', '3', '4', '5']
-		initial_joints=[1382,-4879,-18666,-10462,7823]#defined experimentally
+		initial_joints=[678,4492,-17459,-827,7823]#defined experimentally
 		
 		self.serial_write(b'DEFP A \r')
 		time.sleep(0.2)
@@ -165,35 +181,7 @@ class Robot():
 	
 	def get_serial(self):
 		return self.ser
-
-	def calibrate (self, FPS):	#function that is used to calibrate the robot in the begging of running the program
-		CalibrationClock = pygame.time.Clock()
-		print('Move the robot arm to the calibration position. Use the Joystick.\n', 'Click x when in calibration position')
-		try:
-			while True:
-				# Handle events
-				if pygame.event.peek(): #if there are events waiting in joystick queue
-					axes, buttons, quit = get_joystick(self.joystick)
 	
-				if quit:
-					return None #Calibration failed
-				
-				if buttons[0]: #x button pressed
-					print('Calibration concluded with success')
-					self.manual_end()
-					self.calculate_pos()
-					self.manual_start_midle()
-					
-					#self.sharedData[0]= self.calibratedPos = self.pos
-
-					return True #Calibration ended
-				
-				self.manual_move(axes,buttons)
-				CalibrationClock.tick(FPS)
-		
-		except KeyboardInterrupt:
-			return False #Calibration Failed and exit program
-		
 
 	def initial_manual_start(self,  type='J',*speed):
 		if not speed: #if speed argument is not given, use normal speed of robot
@@ -201,7 +189,9 @@ class Robot():
 		
 		self.serial_write(b'\r')
 		self.serial_write(b'~ \r')
+		time.sleep(0.5)
 		self.serial_write(b's \r')
+		time.sleep(0.5)
 		self.serial_write(f'{speed} \r'.encode('utf-8'))
 		if type=='J':
 			self.info_computer_share['state'] = 0 #robot is running in joints mode
@@ -236,6 +226,7 @@ class Robot():
 		if self.x_Pressed and button_Is_Pressed: #x was pressed and still is - no changes to sensitivity
 			return False
 		elif not self.x_Pressed and button_Is_Pressed: #x was not pressed and now is pressed - change sensitivity from Low to high or High to low
+			self.joystick.rumble(0.1, 1, 300)
 			if self.manual_mode == 'X': #robot was previously with low speed - and will now have high speed
 				self.manual_end()
 				time.sleep(0.1)
@@ -245,7 +236,6 @@ class Robot():
 				self.manual_mode = 'J'
 				self.initial_manual_start(type = self.manual_mode)
 				self.previousHighSpeed = True
-				self.joystick.rumble(0.1, 1, 100)
 				print('High speed')
 
 
@@ -258,9 +248,10 @@ class Robot():
 				self.manual_mode = 'X'
 				self.initial_manual_start(type = self.manual_mode)
 				self.previousHighSpeed = False
-				self.joystick.rumble(1, 0.2, 100)
 				print('Low speed')
 
+			time.sleep(0.3)
+			self.serial_write(b'c \r')
 			self.x_Pressed=True
 			return True
 		else: 
@@ -337,12 +328,18 @@ class Robot():
 		print('deltasxyz',deltasXYZRP)
 		for i, delta in enumerate(deltasXYZRP):
 			if delta!=0:
-				self.serial_write(f'SETPVC {prefix}[{ptNumber}] {cartesian[i]} {self.pos[i]+delta}\r'.encode('utf-8'))
+				self.serial_write(f'SETPVC {prefix}[{ptNumber}] {cartesian[i]} {int(self.pos[i]+delta)}\r'.encode('utf-8'))
 				time.sleep(0.4)
 
 
 	def set_path(self,prefix ):
-		#recomendade values: self.delta_cut=[500,-300]#x,z
+		self.delta_cut[0]=abs(self.delta_cut[0])
+		self.delta_cut[1]=-abs(self.delta_cut[1])
+		
+		#[500,-300]#x,z
+
+
+
 		#POINT 1 - here
 		deltasXYZRP=[0]*5
 		self.set_point(prefix, 1, deltasXYZRP)
@@ -390,9 +387,9 @@ class Robot():
 		self.set_path(prefix)		
 		time.sleep(1)
 		#move through all positions
-		self.serial_write(f'MOVES {prefix} 2 {nrpoints} {200 * nrpoints}\r'.encode('utf-8'))
+		self.serial_write(f'MOVES {prefix} 2 {nrpoints} {400 * nrpoints}\r'.encode('utf-8'))
 		print('Cutting')
-		time.sleep(2*nrpoints)
+		time.sleep(4*nrpoints)
 		print('Finished cutting')
 
 	def plan_to_cut(self, axes, buttons):
@@ -440,38 +437,36 @@ class Robot():
 			self.manual_move(axes, buttons)
 		
 
-
 	def manual_move(self, axes,buttons ):
-
-		if axes[1] < -0.2:
+		if axes[1] < -0.4:
 			self.serial_write(b'1 \r')
 			self.message['1']+=1
 
-		elif axes[1] > 0.2:
+		elif axes[1] > 0.4:
 			self.serial_write(b'Q \r')
 			self.message['Q']+=1
 
-		if axes[0] < -0.2:
+		elif axes[0] < -0.4:
 			self.serial_write(b'2 \r')
 			self.message['2']+=1
 
-		elif axes[0] > 0.2:
+		elif axes[0] > 0.4:
 			self.serial_write(b'W \r')
 			self.message['W']+=1
 
-		if axes[2] < -0.2:
+		if axes[2] < -0.4:
 			self.serial_write(b'4 \r')
 			self.message['4']+=1
 
-		elif axes[2] > 0.2:
+		elif axes[2] > 0.4:
 			self.serial_write(b'R \r')
 			self.message['R']+=1
 
-		if axes[3] < -0.2:
+		elif axes[3] < -0.4:
 			self.serial_write(b'T \r')
 			self.message['T']+=1
 
-		elif axes[3] > 0.2:
+		elif axes[3] > 0.4:
 			self.serial_write(b'5 \r')
 			self.message['5']+=1
 		
@@ -507,13 +502,15 @@ class Robot():
 				self.pos[i]=self.TruePose[i] + deltas[i]*XYZ_sensitivity[i]
 
 		elif self.manual_mode =='J':
-			J_sensitivity = 35.79*self.speedHigh/self.speedLow #from data
-			pitch_sensitivity=69.275*self.speedHigh/self.speedLow #from data
+			
+			#J_sensitivity = 35.79*self.speedHigh/self.speedLow #from data
+			#pitch_sensitivity=69.275*self.speedHigh/self.speedLow #from data
 			for i in range(len(self.joints)):
-				if i ==3:
-					self.joints[i]=self.TrueJoints[i] + pitch_sensitivity*deltas[i]
-				else:
-					self.joints[i]=self.TrueJoints[i] + J_sensitivity*deltas[i]
+				model= self.models_joints[f'Joints_model{i}']
+				delta = np.array([deltas[i]]).reshape(-1,1)
+				change_joints=int(model.predict(delta))
+				self.joints[i]=self.TrueJoints[i] + change_joints
+				self.pos=self.joints.copy()
 			
 
 			#self.pos =foward_kinematics(self.joints, 'bisturi') LEFT TO IMPLEMENT FULLY...
@@ -524,7 +521,7 @@ class Robot():
 
 	def go_home(self):
 		self.serial_write(b'home\r')
-		time.sleep(180) # homing takes a few minutes ...
+		time.sleep(150) # homing takes a few minutes ...
 	
 	def calculate_pos(self):
 
@@ -542,10 +539,10 @@ class Robot():
 				result_list.append(int(value))
 			self.joints = result_list[0:5]
 			self.pos = result_list[5:10] 
-			
 		else:
-			self.pos = [0,0,0,0,0] 
-			self.joints=[0,0,0,0,0] 
+			self.pos=[0,0,0,0,0]
+			self.joints =[0,0,0,0,0]
+		
 		self.message= {'Q':0, '1':0,  'W':0,'2':0, 'E':0,'3':0,  'R':0,'4':0, 'T':0,'5':0}
 		self.TruePose=self.pos.copy()
 		self.TrueJoints=self.joints.copy()
@@ -579,12 +576,17 @@ class Robot():
 
 class cameraRobot():
 	#this robot's y axis should be parallel to the table/jellow
-	def __init__(self, shared_camera_pos=None,atHome=False, robotSpeed=2, comPort='COM4' ):
+	def __init__(self, shared_camera_pos,atHome=False, robotSpeed=2, comPort='COM4' ):
 		if not atHome:
 			self.ser = serial.Serial(comPort, baudrate=9600, bytesize=8, timeout=2, parity='N', xonxoff=0) #change for lab ------------------------HERE FOR LAB
 			print("COM port in use: {0}".format(self.ser.name))	
 		else:
 			self.ser=False	
+
+		time.sleep(1)
+		self.go_home()
+		time.sleep(15)
+
 		self.speed=robotSpeed
 		self.shared_camera_pos = shared_camera_pos
 		self.square_pressed=False 
@@ -600,15 +602,15 @@ class cameraRobot():
 
 	def go_to_initial_position(self):
 		joints=['1','2', '3', '4', '5']
-		initial_joints=[-303,-15473,-16732,-24732,47] #defined experimentally	
+		initial_joints=[2021,-4748,-25945,14948,5209] #defined experimentally	
 		self.serial_write(b'DEFP A \r')
-		time.sleep(0.2)
+		time.sleep(0.4)
 		self.serial_write(b'HERE A \r')
 		time.sleep(0.4)
 		for i, coordenate in  enumerate(initial_joints):	
 			printToRobot=f'SETPV A {joints[i]} {int(coordenate)}\r'
 			self.serial_write(printToRobot.encode('utf-8'))
-			time.sleep(0.2)
+			time.sleep(0.4)
 		self.serial_write(b'MOVE A 600\r')
 		time.sleep(6)
 
@@ -617,7 +619,7 @@ class cameraRobot():
 		if max(buttons[11:15]):
 			if not self.arrowsPressed: #if some arrow button has just been pressed
 				self.manual_end()
-				time.sleep(0.1)
+				time.sleep(0.2)
 				self.calculate_pos()
 				time.sleep(0.2)
 				delta_z =0
@@ -627,15 +629,15 @@ class cameraRobot():
 				elif buttons[11]-buttons[12]<0: #move down - arrow down pressed
 					delta_z=-500
 				if buttons[13]-buttons[14]>0: #move backward - arrow left pressed
-					delta_x=300
+					delta_x=400
 				elif buttons[13]-buttons[14]<0:#move foward - arrow right pressed
-					delta_x=-300
+					delta_x=-400
 				new_position = [self.pos[0]+delta_x, self.pos[1], self.pos[2]+delta_z, self.pos[3],self.pos[4] ]
 				self.set_position(new_position)
 				self.serial_write(b'Move A 200\r')
 				time.sleep(2)
 				self.pos = new_position
-				self.shared_camera_pos = new_position   
+				self.shared_camera_pos.put(new_position) 
 				self.arrowsPressed = True
 				self.manual_start_midle()
 		else:
@@ -655,7 +657,7 @@ class cameraRobot():
 			self.manual_start_midle()
 			self.square_pressed=True 
 			time.sleep(0.3)
-			self.serial_write(b'con \r')
+			self.serial_write(b'c \r')
 			time.sleep(0.2)
 		
 	def manual_move(self,axes, buttons):
@@ -677,11 +679,11 @@ class cameraRobot():
 		
 		for i in message:
 			self.message[i]+=message[i]
-		if max([self.message['1'],self.message['Q']]): #if there was movement on the base
+		""" if max([self.message['1'],self.message['Q']]): #if there was movement on the base
 			if not max([message['1'],message['Q']]): #and there was no movement of the base in this iteration
-				self.calculate_pos()
+				self.calculate_pos() """
 		self.predict_next_pos()
-		self.shared_camera_pos=self.pos
+		self.shared_camera_pos.put(self.pos)
 
 
 	def predict_next_pos(self, ):
@@ -698,6 +700,8 @@ class cameraRobot():
 
 	def set_position(self, position_values):
 		cartesian=['X','Y', 'Z', 'P', 'R']
+		self.serial_write(b'HERE A\r')
+		time.sleep(0.2)
 		for i,coordenate in enumerate(position_values) :
 			if self.pos[i] != position_values[i]:
 				#printToRobot=f'SHIFT AA BY {i+1} {int(delta)} \r'
@@ -731,7 +735,7 @@ class cameraRobot():
 	
 	def go_home(self):
 		self.serial_write(b'home\r')
-		time.sleep(180) # homing takes a few minutes ...
+		time.sleep(150) # homing takes a few minutes ...
 	
 	def calculate_pos(self):
 		self.serial_write(b'\r')
@@ -741,6 +745,7 @@ class cameraRobot():
 		if self.ser!=False: #not at home - in the lab
 			clean_buffer(self.ser)
 			robot_output = read_and_wait(self.ser,0.15)
+			print('Robot output', robot_output)
 			output_after = robot_output.replace(': ', ':').replace('>','')
 			pairs=output_after.split() #separate in pairs of the form 'n:m'
 			result_list=[]
@@ -750,12 +755,13 @@ class cameraRobot():
 			self.joints = result_list[0:5]
 			self.pos = result_list[5:10]
 		else:
-			self.pos =[0,0,0,0,0]
-			self.joints=[0,0,0,0,0]
+			self.pos=[1000,-1000,2034,234,1234]
+			self.joints =[0,0,0,0,0]
+
 		self.message= {'Q':0, '1':0,  'R':0,'4':0}
 		self.TruePose=self.pos.copy()
 		self.Truejoints=self.joints.copy()
-		self.shared_camera_pos = self.pos.copy()
+		self.shared_camera_pos.put(self.pos)
 
 	def get_pos(self):
 		#function to get axis position values

@@ -15,6 +15,8 @@ from communication_client import *
 def do_obstacle_avoidance(bisturi_pose, camera_pose, L, info_computer_share):
 	safety_distance = 200
 	
+
+
 	transformation_matrix = np.array([
 		[-1, 0, 0, L],
 		[0, -1, 0, 0],
@@ -23,8 +25,8 @@ def do_obstacle_avoidance(bisturi_pose, camera_pose, L, info_computer_share):
 	])
 
 	# take the first 3 elements of the position vector, convert to mm and add a 1 for homogeneous form
-	end_effector1_R1 = np.concatenate([np.array(bisturi_pose[:3]) / 10, np.array([1])])
-	end_effector2_R2 = np.concatenate([np.array(camera_pose[:3]) / 10, np.array([1])])
+	end_effector1_R1 = np.concatenate([np.array(bisturi_pose[:3])/10 , np.array([1])])
+	end_effector2_R2 = np.concatenate([np.array(camera_pose[:3]) /10, np.array([1])])
 	end_effector2_R1 = np.dot(transformation_matrix, end_effector2_R2)
 	
 	# Calculate the Euclidean distance between the two points
@@ -32,15 +34,15 @@ def do_obstacle_avoidance(bisturi_pose, camera_pose, L, info_computer_share):
 	
 	# Check for collision and return result
 	if distance > safety_distance:
-		info_computer_share['colision']=False
+		info_computer_share['coliding']=False
 		return False  # No collision
 	else:
-		info_computer_share['colision']=True
+		info_computer_share['coliding']=True
 		return True  # Collision
 
 def camera_robot_loop(FPS, athomeBool,joystick_queue, shared_camera_pos):
 	clock = pygame.time.Clock()
-	camera_robot = cameraRobot(shared_camera_pos, comPort='COM4', atHome=athomeBool)
+	camera_robot = cameraRobot(shared_camera_pos, comPort='COM3', atHome=athomeBool)
 	axes=[0]*4+[-1,-1]
 	buttons=[0]*15
 	coliding=False
@@ -70,9 +72,11 @@ def camera_robot_loop(FPS, athomeBool,joystick_queue, shared_camera_pos):
 def bisturi_robot_controll_loop( FPS, L, athomeBool,joystick_queue, shared_camera_pos, info_computer_share):
 	joystick = initialize_joystick()
 	clock = pygame.time.Clock()
-	bisturi_robot=Robot(joystick, info_computer_share ,comPort='COM4', atHome=athomeBool)
-	count=0
+	bisturi_robot=Robot(joystick, info_computer_share ,comPort='COM6', atHome=athomeBool)
+	colision_count=0
+	last_camera_pose=[0,0,0,0,0]
 	colision =False
+	aux=False
 	try:
 		while True:
 		# Handle events
@@ -85,22 +89,44 @@ def bisturi_robot_controll_loop( FPS, L, athomeBool,joystick_queue, shared_camer
 				joystick_queue.put(axes + buttons + [True]+[False])
 				info_computer_share['state']=4
 				return
+			
 			if bisturi_robot.getcount()> 7*FPS: #happens if more than 7 seconds have passed since last time a LISTPV was done
 				null_axes=[0,0,0,0,-1,-1]
 				check_axes=[abs(axes[i]-null_axes[i]) for i in range(len(axes))]
 				if max(check_axes)<0.2 and buttons[9]==0 and buttons[10]==0 : #if no button is being pressed, get position of robot
 					
 					bisturi_robot.manual_end()
+					time.sleep(0.5)
 					bisturi_robot.calculate_pos() #this returns count to zero
+					time.sleep(0.5)
 					bisturi_robot.update_bisturi_pos_shared()
 					bisturi_robot.manual_start_midle()
+					time.sleep(0.3)
+			
 
-			if not athomeBool:
-				colision = do_obstacle_avoidance(bisturi_pose = bisturi_robot.get_last_pos(), camera_pose=shared_camera_pos, L=L, info_computer_share=info_computer_share)
+			""" if buttons[15] and not aux:
+				aux=True
+				colision=True
+				info_computer_share['coliding']=True """
+			
+			if not shared_camera_pos.empty(): #if there are events waiting in joystick queue
+				last_camera_pose = shared_camera_pos.get()
+				#print('Joystick at camera',joystick_values)
+				while not shared_camera_pos.empty():
+					shared_camera_pos.get()
+			
+			colision = do_obstacle_avoidance(bisturi_pose = bisturi_robot.get_last_pos(), camera_pose=last_camera_pose, L=L, info_computer_share=info_computer_share)
 			if not colision:
 				bisturi_robot.iterate(axes,buttons)
+				colision_count=0
+
+			elif colision_count>8*FPS:
+				bisturi_robot.iterate(axes,buttons)	
+
 			else:
-				joystick_queue.put(axes + buttons + [quit]+[True])
+				joystick_queue.put(axes + buttons + [quit]+[True])		
+				colision_count+=1
+
 			clock.tick(FPS)
 	
 	except KeyboardInterrupt:
@@ -114,6 +140,7 @@ def bisturi_robot_controll_loop( FPS, L, athomeBool,joystick_queue, shared_camer
 
 
 def send_robot_data(athome,info_computer_share):
+	athome=False
 	if not athome:
 		FPS = 5
 		HEADER, FORMAT, DISCONNECT_MESSAGE, ADDR = define_constants()
@@ -124,10 +151,11 @@ def send_robot_data(athome,info_computer_share):
 			time.sleep(1)
 def main():
 	FPS=40
-	L= 1000 #distance between base of the 2 robots in mm
-	athomeBool=True
+	L= 1200 #distance between base of the 2 robots in mm
+	L=int(input('What is the distance between the center of the base of the 2 robots? (in mm)'))
+	athomeBool=False
 	joystick_queue = queue.LifoQueue() #this queue will save values for the joystick's current state - it will be shared between the loops for both robots
-	shared_camera_pos =[0,0,0,0,0]
+	shared_camera_pos =queue.LifoQueue()
 	info_computer_share = {'state': -1, 'last_bisturi_pos': [0,0,0,0,0],  'cutting_plan':[0,0],'coliding':False}
 							#state: -1 - Initializing
 							#		0 - Running joints mode
