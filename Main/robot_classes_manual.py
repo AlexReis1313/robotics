@@ -8,98 +8,8 @@ import numpy as np
 import pickle
 
 from joystick_functions import*
-def foward_kinematics(joints,robot_type): #left to implement
-		if robot_type == 'bisturi':
-			EF = 0.15+0.16
-		elif robot_type == 'camera':
-			EF = 0.18
-		else:
-			raise TypeError('Invalid robot_type') 
-		theta1,theta2,theta3,theta4,theta5 = joints
-
-		offset1 = 0 #I still need to see what are the robot values in homing position and subtract them here
-		offset2 = 0
-		offset3 = 0
-		offset4 = 0 
-		offset5 = 0
-
-		theta1 += offset1
-		theta2 += offset2
-		theta3 += offset3
-		theta4 += offset4
-		theta5 += offset5
-
-		T_01 = np.matrix([[math.cos(theta1),math.sin(theta1),0,0],
-					[math.sin(theta1),math.cos(theta1),0,0],
-					[0,0,1,0],
-					[0,0,0,1]])
-		T_12 = np.matrix([[1,0,0,0.05],
-					[0,1,0,0],
-					[0,1,0,3585],
-					[0,0,0,1]])
-		T_23 = np.matrix([[math.cos(theta2),-math.sin(theta2),0,0],
-					[0,0,1,0],
-					[-math.sin(theta2),-math.cos(theta2),0,0],
-					[0,0,0,1]])
-		T_34 = np.matrix([[0,1,0,0],
-					[-1,0,0,0],
-					[0,0,1,0.135]])
-		T_45 = np.matrix([[math.cos(theta3),-math.sin(theta3),0,0.3],
-					[math.sin(theta3),math.cos(theta3),0,0],
-					[0,0,1,0],
-					[0,0,0,1]])
-		T_56 = np.matrix([[math.cos(theta4),-math.sin(theta4),0,0.35],
-					[math.sin(theta4),math.cos(theta4),0,0],
-					[0,0,1,0],
-					[0,0,0,1]])
-		T_67 = np.matrix([[0,-1,0,0],
-					[1,0,0,0],
-					[0,0,1,0],
-					[0,0,0,1]])
-		T_78 = np.matrix([[math.cos(theta5),-math.sin(theta5),0,0],
-					[0,0,-1,0],
-					[math.sin(theta5),math.cos(theta5),0,0],
-					[0,0,0,1]])
-		T_89 = np.matrix([[1,0,0,0],
-					[0,1,0,0],
-					[0,0,1,EF],
-					[0,0,0,1]])
-					
-		T = T_01.dot(T_12).dot(T_23).dot(T_34).dot(T_45).dot(T_56).dot(T_67).dot(T_78).dot(T_89)
-		pos = T[0:3,3]
-		orientation = T[0:3,0:3] #If needed
-		return pos.tolist() #return in list of values
-
-def read_and_wait(ser, wait_time):
-    #this function reads the information that the robot outputs to the computer and returns it as a string
-    serString = "" # Used to hold data coming over UART
-    output = ""
-    flag = True
-    start_time = time.time()
-    while flag:
-        # Wait until there is data waiting in the serial buffer
-        if ser.in_waiting > 0:
-            # Read data out of the buffer until a carriage return / new line is found
-            serString = ser.readline()
-            # Print the contents of the serial data
-            try:
-                output = output + serString.decode("Ascii")
-
-            except:
-                pass
-        else:
-            deltat = time.time() - start_time
-            if deltat>wait_time:
-                flag = False
-    return output
-
-def clean_buffer(ser):
-    flag = True
-    while flag:
-        if ser.in_waiting > 0:
-            ser.readline()          
-        else:
-            break   
+from foward_kinematics import*
+from serial_functions import*
 
 
 class Robot():
@@ -133,14 +43,8 @@ class Robot():
 					self.models_joints=pickle.load(f)
 				except EOFError:
 					break
-		""" with open("XYZ_models.pickle", "rb") as f:
-			while True:
-				try:
-					self.models_XYZ=pickle.load(f)
-				except EOFError:
-					break
- 		"""
 		
+
 		
 	def go_to_initial_position(self):
 		cartesian=['X','Y', 'Z', 'P', 'R']
@@ -148,9 +52,9 @@ class Robot():
 		initial_joints=[678,4492,-17459,-827,7823]#defined experimentally
 		
 		self.serial_write(b'DEFP A \r')
-		time.sleep(0.2)
+		time.sleep(0.4)
 		self.serial_write(b'HERE A \r')
-		time.sleep(0.2)
+		time.sleep(0.4)
 		for i, coordenate in  enumerate(initial_joints):	
 			printToRobot=f'SETPV A {joints[i]} {int(coordenate)}\r'
 			self.serial_write(printToRobot.encode('utf-8'))
@@ -178,11 +82,9 @@ class Robot():
 		self.delta_cut=[0,0]
 		self.count=0
 
-	
 	def get_serial(self):
 		return self.ser
 	
-
 	def initial_manual_start(self,  type='J',*speed):
 		if not speed: #if speed argument is not given, use normal speed of robot
 			speed=self.speed
@@ -275,7 +177,7 @@ class Robot():
 			self.update_bisturi_pos_shared()
 			self.circle_Pressed=True  
 
-			#thi is used to gather data
+			#this is used to gather data
 			""" if self.manual_mode=='X':
 				delta_tara_pos=[-self.tara_position[i]+self.pos[i] for i in range(len(self.pos))]
 				string=f'message:{self.message}  delta:{delta_tara_pos}   XYZ\n'
@@ -287,11 +189,7 @@ class Robot():
 			self.f.write(string) 
 			self.joints_last=self.joints.copy()"""
 
-			
-                            
-
-
-
+		
 	def evaluate_triangle(self, triangleButtons):
 		if not triangleButtons: #triangle is not pressed
 			self.triangle_Pressed=False
@@ -336,10 +234,7 @@ class Robot():
 		self.delta_cut[0]=abs(self.delta_cut[0])
 		self.delta_cut[1]=-abs(self.delta_cut[1])
 		
-		#[500,-300]#x,z
-
-
-
+		#[500,-300]#x,z - some recomended values
 		#POINT 1 - here
 		deltasXYZRP=[0]*5
 		self.set_point(prefix, 1, deltasXYZRP)
@@ -408,21 +303,14 @@ class Robot():
 				self.info_computer_share['state'] = 0  #joints mode
 			self.manual_start_midle()
 			return
-		
 		sensitivity=2
 		show=False
-
 		if abs(axes[0])>0.4:#length of cut
 			self.delta_cut[0]+=axes[0]*sensitivity
 			show=True
 		if abs(axes[3])>0.4: #depth
 			self.delta_cut[1]+=axes[3]*sensitivity
-			show=True
-
-		""" if abs(axes[0])>0.3: #direction in degrees
-			self.delta_cut[2]+= axes[0]*sensitivity
-			show=True """			
-
+			show=True		
 		if show:
 			self.info_computer_share['cutting_plan'] = [round(self.delta_cut[i]/10,1) for i in range(len(self.delta_cut))]
 
@@ -510,7 +398,7 @@ class Robot():
 				delta = np.array([deltas[i]]).reshape(-1,1)
 				change_joints=int(model.predict(delta))
 				self.joints[i]=self.TrueJoints[i] + change_joints
-				self.pos=self.joints.copy()
+				#self.pos=self.joints.copy()
 			
 
 			#self.pos =foward_kinematics(self.joints, 'bisturi') LEFT TO IMPLEMENT FULLY...
@@ -602,7 +490,7 @@ class cameraRobot():
 
 	def go_to_initial_position(self):
 		joints=['1','2', '3', '4', '5']
-		initial_joints=[2021,-4748,-25945,14948,5209] #defined experimentally	
+		initial_joints=[2021,-4748,-25945,14948,-15828] #defined experimentally	
 		self.serial_write(b'DEFP A \r')
 		time.sleep(0.4)
 		self.serial_write(b'HERE A \r')
