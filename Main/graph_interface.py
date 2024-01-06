@@ -82,9 +82,9 @@ def main_graphics(info_computer_share):
             state_text = "Initializing"
         elif state == 0:
             state_text = "Running in joints mode"
-            last_bisturi_text = f"Joint's Values  -> (j1,j2,j3,j4,j5)=({last_bisturi_pos[0]}, {last_bisturi_pos[1]}, {last_bisturi_pos[2]}, {last_bisturi_pos[3]},{last_bisturi_pos[4]})"
-            cv2.putText(info_window, last_bisturi_text, (10, 60),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2, cv2.LINE_AA)  # Change size to 0.7 and color to white
+            #last_bisturi_text = f"Joint's Values  -> (j1,j2,j3,j4,j5)=({last_bisturi_pos[0]}, {last_bisturi_pos[1]}, {last_bisturi_pos[2]}, {last_bisturi_pos[3]},{last_bisturi_pos[4]})"
+            #cv2.putText(info_window, last_bisturi_text, (10, 60),
+            #        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2, cv2.LINE_AA)  # Change size to 0.7 and color to white
         elif state == 1:
             state_text = "Running in XYZ mode"
 

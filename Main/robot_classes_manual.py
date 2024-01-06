@@ -473,7 +473,7 @@ class cameraRobot():
 
 		time.sleep(1)
 		self.go_home()
-		time.sleep(15)
+		#time.sleep(15)
 
 		self.speed=robotSpeed
 		self.shared_camera_pos = shared_camera_pos
